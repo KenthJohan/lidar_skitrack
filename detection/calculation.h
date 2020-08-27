@@ -917,15 +917,15 @@ void show (const char * filename, nng_socket socks[])
 	{
 		int r;
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_POS], linepos1, VISUAL_LINE_COUNT*POINT_STRIDE*2*sizeof(float), 0);
-		perror (nng_strerror (r));
+		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_COL], linecol1, VISUAL_LINE_COUNT*2*sizeof(uint32_t), 0);
-		perror (nng_strerror (r));
+		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_POINTCLOUD_POS], pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2, 0);
-		perror (nng_strerror (r));
+		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_POINTCLOUD_COL], pointcol, LIDAR_WH*sizeof(uint32_t)*2, 0);
-		perror (nng_strerror (r));
+		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_TEX], imgv, IMG_XN*IMG_YN*sizeof(uint32_t), 0);
-		perror (nng_strerror (r));
+		if (r) {perror (nng_strerror (r));}
 	}
 
 }
