@@ -1,0 +1,24 @@
+#version 330 core
+
+in float colortype;
+in vec3 vbc;
+uniform sampler2D pallete;
+
+const float lineWidth = 0.5f;
+const vec3 lineColor = vec3(0.7, 0.7, 0.7);
+
+float edgeFactor()
+{
+	vec3 d = fwidth(vbc);
+	vec3 f = step(d * lineWidth, vbc);
+	return min(min(f.x, f.y), f.z);
+}
+
+
+void main()
+{
+	vec3 color = vec3(0.0, 0.0, 1.0);
+	color = texture2D (pallete, vec2 (round (colortype)/256, 0)).rgb;
+	gl_FragColor = vec4(min(vec3(edgeFactor()), color), 0.5);
+	//gl_FragColor = color;
+}
