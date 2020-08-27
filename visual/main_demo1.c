@@ -30,7 +30,7 @@
 
 #define WIN_W 640
 #define WIN_H 480
-#define WIN_TITLE "Graphics server"
+#define WIN_TITLE "Skitrack visualizer"
 
 #define MAIN_RUNNING    UINT32_C (0x00000001)
 #define MAIN_FULLSCREEN UINT32_C (0x00000002)
