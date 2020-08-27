@@ -87,7 +87,7 @@ void show (const char * filename, nng_socket socks[])
 
 
 	points_read_filename (filename, s1.pc, &s1.pc_count);
-	points_test_sinus_slope (s1.pc);
+	//points_test_sinus_slope (s1.pc);
 
 	memcpy (pointpos, s1.pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
 	skitrack1_process (&s1);
@@ -152,7 +152,7 @@ void show (const char * filename, nng_socket socks[])
 		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2.g[1] + 30.0f * s2.k);
 		float rot[3*3];
 		memcpy (rot, s1.crot, sizeof (rot));
-		m3f32_lapacke_inverse (rot, 3);
+		//m3f32_lapacke_inverse (rot, 3);
 		for (float * i = linepos1[VISUAL_LINE_SKITRACK+0].a; i <= linepos1[VISUAL_LINE_SKITRACK_END].b; i += POINT_STRIDE)
 		{
 			mv3f32_mul (i, rot, i);
