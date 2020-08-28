@@ -803,7 +803,10 @@ enum visual_line
 
 
 
-
+#define VISUAL_MODE_IMG_MASK UINT32_C(0x0000000F)
+#define VISUAL_MODE_IMG1     UINT32_C(0x00000001)
+#define VISUAL_MODE_IMG2     UINT32_C(0x00000002)
+#define VISUAL_MODE_IMG3     UINT32_C(0x00000003)
 
 
 
@@ -827,7 +830,7 @@ enum visual_line
 	16: Find all peaks                  : (1D image) -> ((position), (strength))
 	17: Output of skitrack position     : ((position), (strength))
 */
-void show (const char * filename, nng_socket socks[])
+void show (const char * filename, nng_socket socks[], uint32_t visual_mode)
 {
 	struct skitrack1 s1 = {0};
 	struct skitrack2 s2 = {0};
@@ -846,8 +849,18 @@ void show (const char * filename, nng_socket socks[])
 	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1.pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
 	//Visualize the skitrack and more information:
-	image_visual (imgv, s2.img3, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
-
+	switch (visual_mode & VISUAL_MODE_IMG_MASK)
+	{
+	case VISUAL_MODE_IMG1:
+		image_visual (imgv, s2.img1, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		break;
+	case VISUAL_MODE_IMG2:
+		image_visual (imgv, s2.img2, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		break;
+	case VISUAL_MODE_IMG3:
+		image_visual (imgv, s2.img3, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		break;
+	}
 
 
 

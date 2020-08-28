@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 //git clone https://github.com/nanomsg/nng
 //cd nng && mkdir build && cd build
@@ -49,7 +50,14 @@ int main (int argc, char const * argv[])
 	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_POS,       "tcp://localhost:9006");
 	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_COL,       "tcp://localhost:9007");
 	ASSERT_PARAM_NOTNULL (argv[1]);
-	show (argv[1], socks);
+	uintmax_t visual_mode = VISUAL_MODE_IMG1;
+	if (argc >= 3 && argv[2])
+	{
+		char * e;
+		visual_mode = strtoumax (argv[2], &e, 0);
+		ASSERT (visual_mode <= UINT32_MAX);
+	}
+	show (argv[1], socks, (uint32_t)visual_mode);
 	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_POS]);
 	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_COL]);
 	nng_close (socks[MAIN_NNGSOCK_TEX]);

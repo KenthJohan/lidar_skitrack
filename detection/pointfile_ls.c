@@ -90,7 +90,7 @@ int main (int argc, char const * argv[])
 			if (fgets (buf, sizeof (buf), f) == NULL) {goto exit_while;};
 			buf[strcspn(buf, "\r\n")] = 0;
 			printf ("Examining LiDAR point file: %s\n", buf);
-			show (buf, socks);
+			show (buf, socks, VISUAL_MODE_IMG1);
 			break;
 		case 'c':
 			//copy_file (buf, "../txtpoints2");
