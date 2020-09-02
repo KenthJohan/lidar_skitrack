@@ -599,6 +599,7 @@ static void skitrack1_process (struct skitrack1 * s)
 	printf ("eigen vector:\n"); m3f32_print (s->c, stdout);
 	printf ("eigen value: %f %f %f\n", s->w[0], s->w[1], s->w[2]);
 
+
 	//Rectify every point by this rotation matrix which is the current orientation of the points:
 	s->crot[0] = s->c[3];
 	s->crot[1] = s->c[6];
@@ -611,13 +612,17 @@ static void skitrack1_process (struct skitrack1 * s)
 	s->crot[6] = s->c[5];
 	s->crot[7] = s->c[8];
 	s->crot[8] = s->c[2];
-	//TODO: Do a matrix matrix multiplication instead of matrix vector multiplication:
-	for (uint32_t i = 0; i < s->pc_count; ++i)
+
+	//Rectify every point by this rotation matrix which is the current orientation of the points:
 	{
-		float * v = s->pc + (i * POINT_STRIDE);
-		mv3f32_mul (v, s->crot, v);
+		float pc[LIDAR_WH*POINT_STRIDE] = {0.0f};
+		float alpha = 1.0f;
+		float beta = 0.0f;
+		//c = alpha * (pc) * (pc^t) + beta * c
+		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, DIMENSION (3), s->pc_count, DIMENSION (3), alpha, s->crot, 3, s->pc, POINT_STRIDE, beta, pc, POINT_STRIDE);
+		memcpy (s->pc, pc, sizeof (pc));
 	}
-	//cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, 4, point_pos1_count, 4, 1.0f, rotation, 4, point_pos1, 4, 0.0f, point_pos1, 4);
+
 }
 
 
