@@ -24,24 +24,10 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
 #include "csc_crossos.h"
 #include "csc_malloc_file.h"
 
-#define RGBA(r,g,b,a) (((r) << 0) | ((g) << 8) | ((b) << 16) | ((a) << 24))
+#include "points_read.h"
+#include "lidar.h"
 
-#define POINT_STRIDE 4
 
-#define LIDAR_W 320
-#define LIDAR_H 20
-#define LIDAR_WH LIDAR_W*LIDAR_H
-#define LIDAR_FPS 30
-#define LIDAR_FOV_W 60
-#define LIDAR_FOV_H 4
-#define LIDAR_INDEX(x,y) ((x)*LIDAR_H + (y))
-
-#define VOXEL_XN 60
-#define VOXEL_YN 30
-#define VOXEL_ZN 10
-#define VOXEL_INDEX(x,y,z) ((z)*VOXEL_XN*VOXEL_YN + (y)*VOXEL_XN + (x))
-#define VOXEL_SCALE 0.15f
-#define PIXEL_INDEX(x,y) ((y)*VOXEL_XN + (x))
 
 
 
@@ -103,49 +89,7 @@ static void random_points (float v[], unsigned n)
 
 
 
-void points_read (char const s[], float p[], uint32_t *n)
-{
-	uint32_t i = 0;
-	float v[4] = {0.0f};
-	while (s[0] != '\0')
-	{
-		char * e;//Used for endptr of float token
-		v[0] = strtof (s, &e);//Convert string to float starting from (s)
-		if (e == s) {s++; continue;}//If parse fails then try again
-		s = e;//Parse success goto to next token
-		v[1] = strtof (s, &e);//Convert string to float starting from (s)
-		if (e == s) {s++; continue;}//If parse fails then try again
-		s = e;//Parse success goto to next token
-		v[2] = strtof (s, &e);//Convert string to float starting from (s)
-		if (e == s) {s++; continue;}//If parse fails then try again
-		s = e;//Parse success goto to next token
-		memcpy (p, v, sizeof(v));//If a entire point (v) got successfully parsed then copy this point into the point array (p)
-		p += 4;//The point array (p) consist of 4 dim points
-		i++;//Keep track of how many points got parsed
-	}
-	(*n) = i;
-}
 
-
-void points_read_filename (char const * filename, float p[], uint32_t *n)
-{
-	ASSERT_PARAM_NOTNULL (filename);
-	ASSERT_PARAM_NOTNULL (p);
-	ASSERT_PARAM_NOTNULL (n);
-	char const * text = csc_malloc_file (filename);
-	points_read (text, p, n);
-	free ((void*)text);
-}
-
-
-void points_print (float p[], uint32_t n)
-{
-	for (uint32_t i = 0; i < n; ++i)
-	{
-		printf ("%f %f %f\n", p[0], p[1], p[2]);
-		p += 4;
-	}
-}
 
 
 
@@ -612,11 +556,6 @@ lapack_int m3f32_lapacke_inverse (float *A, unsigned n)
 }
 
 
-
-
-
-
-
 struct skitrack1
 {
 	uint32_t pc_count;
@@ -639,7 +578,18 @@ static void skitrack1_process (struct skitrack1 * s)
 	vf32_move_center_to_zero (DIMENSION (3), s->pc, POINT_STRIDE, s->pc_count, s->mean);
 
 	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
-	mf32_get_covariance (DIMENSION (3), s->pc, POINT_STRIDE, s->pc_count, s->c);
+	{
+		//alpha = 1.0f will yield same eigen vectors:
+		float alpha = 1.0f / ((float)s->pc_count - 1.0f);
+		float beta = 0.0f;
+		//c  = covariance matrx
+		//pc = pointcloude
+		//c = alpha * (pc) * (pc^t) + beta * c
+		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, DIMENSION (3), DIMENSION (3), s->pc_count, alpha, s->pc, POINT_STRIDE, s->pc, POINT_STRIDE, beta, s->c, 3);
+	}
+
+
+	printf ("covariance matrix:\n"); m3f32_print (s->c, stdout);
 
 	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
