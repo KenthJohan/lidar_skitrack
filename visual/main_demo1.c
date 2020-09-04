@@ -22,6 +22,8 @@
 #include "gl_tboinfo.h"
 #include "gl_meshinfo.h"
 
+#include "../shared/shared.h"
+
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
 
@@ -36,21 +38,8 @@
 #define MAIN_FULLSCREEN UINT32_C (0x00000002)
 #define MAIN_BORDERLESS UINT32_C (0x00000004)//SDL_WINDOW_BORDERLESS
 
-#define POINTC_W 320
-#define POINTC_H 20
 
 
-
-
-#define VOX_XN 60
-#define VOX_YN 30
-#define VOX_ZN 10
-#define VOX_I(x,y,z) ((z)*VOX_XN*VOX_YN + (y)*VOX_XN + (x))
-#define VOX_SCALE 0.15f
-
-#define IMG_XN 20
-#define IMG_YN 120
-#define IMG_CN 4
 #define TEX_FORMAT GL_RGBA
 
 enum main_glprogram
@@ -93,18 +82,7 @@ enum main_glvbo
 	MAIN_GLVBO_COUNT
 };
 
-enum main_nngsock
-{
-	MAIN_NNGSOCK_POINTCLOUD_POS = 1,
-	MAIN_NNGSOCK_POINTCLOUD_COL,
-	MAIN_NNGSOCK_PLANE,
-	MAIN_NNGSOCK_GROUNDPROJECTION,
-	MAIN_NNGSOCK_VOXEL,
-	MAIN_NNGSOCK_GROUND,
-	MAIN_NNGSOCK_LINE_POS,
-	MAIN_NNGSOCK_LINE_COL,
-	MAIN_NNGSOCK_COUNT
-};
+
 
 
 
@@ -123,6 +101,15 @@ int main (int argc, char * argv[])
 	csc_crossos_enable_ansi_color ();
 	ASSERT (argc);
 	ASSERT (argv);
+	setbuf (stdout, NULL);
+
+#ifdef BUILD_DATE
+	printf("BUILD_DATE: " STRINGIFY(BUILD_DATE) "\n");
+#endif
+
+#ifdef GIT_VERSION
+	printf("GIT_VERSION: " STRINGIFY(GIT_VERSION) "\n");
+#endif
 
 #ifdef USING_QT_CREATOR
 	chdir ("../visual");
@@ -243,7 +230,7 @@ int main (int argc, char * argv[])
 	struct gl_meshinfo meshes;
 	gl_meshinfo_init (&meshes);
 
-	gl_meshinfo_allocate (&meshes, MAIN_MESH_POINTCLOUD, POINTC_W*POINTC_H*2);
+	gl_meshinfo_allocate (&meshes, MAIN_MESH_POINTCLOUD, LIDAR_WH*2);
 	gl_meshinfo_allocate (&meshes, MAIN_MESH_AXIS, 18);
 	gl_meshinfo_allocate (&meshes, MAIN_MESH_CHESS, 6);
 

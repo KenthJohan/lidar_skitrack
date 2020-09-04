@@ -24,6 +24,7 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
 #include "csc_crossos.h"
 #include "csc_malloc_file.h"
 
+#include "../shared/shared.h"
 #include "points_read.h"
 #include "lidar.h"
 #include "pointcloud_pca.h"
@@ -31,7 +32,7 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
 
 
 
-
+/*
 //All socket connection is labeled here:
 enum main_nngsock
 {
@@ -44,7 +45,7 @@ enum main_nngsock
 	MAIN_NNGSOCK_LINE_COL,
 	MAIN_NNGSOCK_COUNT
 };
-
+*/
 
 static void main_nng_send (nng_socket socket, void * data, unsigned size8)
 {
@@ -223,8 +224,7 @@ void gobj_line_send (struct gobj_line * obj)
 
 
 
-#define IMG_XN 20
-#define IMG_YN 120
+
 
 
 void vf32_project_2d_to_1d (float p[], uint32_t xn, uint32_t yn, float k, float q[])
@@ -825,7 +825,7 @@ void show (const char * filename, nng_socket socks[], uint32_t visual_mode)
 		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_POINTCLOUD_COL], pointcol, LIDAR_WH*sizeof(uint32_t)*2, 0);
 		if (r) {perror (nng_strerror (r));}
-		r = nng_send (socks[MAIN_NNGSOCK_TEX], imgv, IMG_XN*IMG_YN*sizeof(uint32_t), 0);
+		r = nng_send (socks[MAIN_NNGSOCK_GROUNDPROJECTION], imgv, IMG_XN*IMG_YN*sizeof(uint32_t), 0);
 		if (r) {perror (nng_strerror (r));}
 	}
 

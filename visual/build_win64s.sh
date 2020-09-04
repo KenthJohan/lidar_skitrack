@@ -1,4 +1,6 @@
 gcc main_demo1.c -ovisualizer_win64s.exe \
+-DBUILD_DATE="$(date +"%Y-%m-%d %H:%M:%S")" \
+-DGIT_VERSION="$(git describe --always)" \
 -D__USE_MINGW_ANSI_STDIO=1 \
 -DNNG_STATIC_LIB \
 -DGLEW_STATIC \

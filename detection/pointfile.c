@@ -33,6 +33,7 @@
 #include "csc_qf32.h"
 #include "csc_filecopy.h"
 
+#include "../shared/shared.h"
 #include "calculation.h"
 
 
@@ -43,12 +44,12 @@ int main (int argc, char const * argv[])
 	ASSERT (argv);
 	csc_crossos_enable_ansi_color();
 	nng_socket socks[MAIN_NNGSOCK_COUNT] = {{0}};
-	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_POS, "tcp://localhost:9002");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_COL, "tcp://localhost:9003");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_TEX,            "tcp://localhost:9004");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_VOXEL,          "tcp://localhost:9005");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_POS,       "tcp://localhost:9006");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_COL,       "tcp://localhost:9007");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_POS,   "tcp://localhost:9002");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_COL,   "tcp://localhost:9003");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_GROUNDPROJECTION, "tcp://localhost:9004");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_VOXEL,            "tcp://localhost:9005");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_POS,         "tcp://localhost:9006");
+	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_COL,         "tcp://localhost:9007");
 	ASSERT_PARAM_NOTNULL (argv[1]);
 	uintmax_t visual_mode = VISUAL_MODE_IMG1;
 	if (argc >= 3 && argv[2])
@@ -60,7 +61,7 @@ int main (int argc, char const * argv[])
 	show (argv[1], socks, (uint32_t)visual_mode);
 	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_POS]);
 	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_COL]);
-	nng_close (socks[MAIN_NNGSOCK_TEX]);
+	nng_close (socks[MAIN_NNGSOCK_GROUNDPROJECTION]);
 	nng_close (socks[MAIN_NNGSOCK_VOXEL]);
 	nng_close (socks[MAIN_NNGSOCK_LINE_POS]);
 	nng_close (socks[MAIN_NNGSOCK_LINE_COL]);
