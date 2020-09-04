@@ -26,6 +26,7 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
 
 #include "points_read.h"
 #include "lidar.h"
+#include "pointcloud_pca.h"
 
 
 
@@ -368,32 +369,7 @@ void point_select (uint32_t pointcol[LIDAR_WH], int x, int y, uint32_t color)
 	pointcol[index] = color;
 }
 
-/**
- * @brief Filter out points that is not good for finding the ground plane
- * @param[out]    dst           Pointer to the destination array where the elements is to be copied
- * @param[in]     dst_stride    Specifies the byte offset between consecutive elements
- * @param[in]     src           Pointer to the source of data to be copied
- * @param[out]    src_stride    Specifies the byte offset between consecutive elements
- * @param[in,out] n             Is a pointer to an integer related to the number of elements to copy or how many were copied
- * @param[in]     dim           How many dimension in each element
- * @param[in]     k2
- */
-void point_filter (float dst[], uint32_t dst_stride, float const src[], uint32_t src_stride, uint32_t *n, uint32_t dim, float k2)
-{
-	uint32_t j = 0;
-	for (uint32_t i = 0; i < (*n); ++i)
-	{
-		float l2 = vvf32_dot (dim, src, src);
-		if (l2 > k2)
-		{
-			vf32_cpy (dim, dst, src);
-			dst += dst_stride;
-			j++;
-		}
-		src += src_stride;
-	}
-	(*n) = j;
-}
+
 
 
 void point_to_pixel (float const p[4], uint32_t xn, uint32_t yn, float * pixel, float * x, float * y)
@@ -556,73 +532,30 @@ lapack_int m3f32_lapacke_inverse (float *A, unsigned n)
 }
 
 
+
+
+
+
+
 struct skitrack1
 {
-	uint32_t pc_count;
-	float pc[LIDAR_WH*POINT_STRIDE];
+	uint32_t pc_count;//Number of points in pointcloud
+	float pc[LIDAR_WH*POINT_STRIDE];//All points of pointcloud
+	float pc1[LIDAR_WH*POINT_STRIDE];//All points of pointcloud
 	float w[3];//Eigen values
 	float c[3*3];//Covariance matrix first then 3x eigen vectors
-	float crot[3*3];
-	float mean[3];
+	float r[3*3];//Rotation matrix
+	float centroid[3];//Center of pointcloud (pc)
 };
 
 
 static void skitrack1_process (struct skitrack1 * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
-
-	//Remove bad points:
-	point_filter (s->pc, POINT_STRIDE, s->pc, POINT_STRIDE, &s->pc_count, 3, 1.0f);
-
-	//Move the center of all points to origin:
-	vf32_move_center_to_zero (DIMENSION (3), s->pc, POINT_STRIDE, s->pc_count, s->mean);
-
-	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
-	{
-		//alpha = 1.0f will yield same eigen vectors:
-		float alpha = 1.0f / ((float)s->pc_count - 1.0f);
-		float beta = 0.0f;
-		//c  = covariance matrx
-		//pc = pointcloude
-		//c = alpha * (pc) * (pc^t) + beta * c
-		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, DIMENSION (3), DIMENSION (3), s->pc_count, alpha, s->pc, POINT_STRIDE, s->pc, POINT_STRIDE, beta, s->c, 3);
-	}
-
-
-	printf ("covariance matrix:\n"); m3f32_print (s->c, stdout);
-
-	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
-	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
-	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', DIMENSION (3), s->c, DIMENSION (3), s->w);
-
-	//LAPACK_ssyev ();
-	printf ("eigen vector:\n"); m3f32_print (s->c, stdout);
+	pointcloud_pca (s->pc, s->pc1, &s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+	printf ("eigen vector:\n");
+	m3f32_print (s->c, stdout);
 	printf ("eigen value: %f %f %f\n", s->w[0], s->w[1], s->w[2]);
-
-
-	//Rectify every point by this rotation matrix which is the current orientation of the points:
-	s->crot[0] = s->c[3];
-	s->crot[1] = s->c[6];
-	s->crot[2] = s->c[0];
-
-	s->crot[3] = s->c[4];
-	s->crot[4] = s->c[7];
-	s->crot[5] = s->c[1];
-
-	s->crot[6] = s->c[5];
-	s->crot[7] = s->c[8];
-	s->crot[8] = s->c[2];
-
-	//Rectify every point by this rotation matrix which is the current orientation of the points:
-	{
-		float pc[LIDAR_WH*POINT_STRIDE] = {0.0f};
-		float alpha = 1.0f;
-		float beta = 0.0f;
-		//c = alpha * (pc) * (pc^t) + beta * c
-		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, DIMENSION (3), s->pc_count, DIMENSION (3), alpha, s->crot, 3, s->pc, POINT_STRIDE, beta, pc, POINT_STRIDE);
-		memcpy (s->pc, pc, sizeof (pc));
-	}
-
 }
 
 
@@ -870,12 +803,12 @@ void show (const char * filename, nng_socket socks[], uint32_t visual_mode)
 		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2.g[1] - 10.0f * s2.k);
 		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2.g[1] + 30.0f * s2.k);
 		float rot[3*3];
-		memcpy (rot, s1.crot, sizeof (rot));
+		memcpy (rot, s1.r, sizeof (rot));
 		m3f32_lapacke_inverse (rot, 3);
 		for (float * i = linepos1[VISUAL_LINE_SKITRACK+0].a; i <= linepos1[VISUAL_LINE_SKITRACK_END].b; i += POINT_STRIDE)
 		{
 			mv3f32_mul (i, rot, i);
-			vvf32_add (4, i, i, s1.mean);
+			vvf32_add (4, i, i, s1.centroid);
 		}
 	}
 

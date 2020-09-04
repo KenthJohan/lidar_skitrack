@@ -58,7 +58,7 @@ int main (int argc, char const * argv[])
 	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_POS,       "tcp://localhost:9006");
 	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_COL,       "tcp://localhost:9007");
 
-	chdir ("../txtpoints/1");
+	chdir ("../txtpoints/4");
 	//show ("14_13_57_24145.txt", socks);
 	//show ("14_13_55_22538.txt", socks);
 	//show ("14_13_53_20565.txt", socks);
