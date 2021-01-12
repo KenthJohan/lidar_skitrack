@@ -15,7 +15,7 @@ SOURCES += ../ce30_driver/timed_udp_socket.cpp
 SOURCES += ../ce30_driver/data_types.cpp
 SOURCES += ../ce30_driver/packet.cpp
 SOURCES += ../ce30_driver/udp_server.cpp
-SOURCES += main.cpp
+SOURCES += ce30_demo.cpp
 
 INCLUDEPATH += C:/msys64/mingw64/include
 INCLUDEPATH += ..
