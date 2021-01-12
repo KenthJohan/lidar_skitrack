@@ -1,11 +1,25 @@
 #include <iostream>
 #include <ce30_driver/ce30_driver.h>
+#include <unistd.h>
+#include "../csc/csc_debug.h"
 
 using namespace std;
 using namespace ce30_driver;
 
 
-int main() {
+int main()
+{
+
+	{
+		clock_t t0 = clock();
+		sleep(1);
+		clock_t t1 = clock();
+		double d = (t1-t0) / CLOCKS_PER_SEC;
+		printf ("d: %lf\n", d);
+		ASSERTF ((d < 1.0001) && (d > 0.9999), "clock() and CLOCKS_PER_SEC not right");
+	}
+
+
 	UDPSocket socket;
 	if (!Connect(socket))
 	{

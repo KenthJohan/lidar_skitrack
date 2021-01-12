@@ -11,7 +11,6 @@ QMAKE_CFLAGS += -Wno-unused-function
 
 SOURCES += ../ce30_driver/utils.cpp
 SOURCES += ../ce30_driver/udp_socket.cpp
-SOURCES += ../ce30_driver/udp_socket_win_impl.cpp
 SOURCES += ../ce30_driver/timed_udp_socket.cpp
 SOURCES += ../ce30_driver/data_types.cpp
 SOURCES += ../ce30_driver/packet.cpp
