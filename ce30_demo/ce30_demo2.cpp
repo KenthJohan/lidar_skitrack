@@ -1,65 +1,76 @@
 #include <iostream>
-#include <chrono>
 #include <ce30_driver/ce30_driver.h>
-
 
 using namespace std;
 using namespace ce30_driver;
 
-#define POINTC_W 320
-#define POINTC_H 20
 
-
-
-
-int main()
-{
-	float points[POINTC_W*POINTC_H*4] = {0.0f};
+int main() {
 	UDPSocket socket;
-	if (socket.Connect() != Diagnose::connect_successful)
+	if (!Connect(socket))
 	{
 		return -1;
 	}
+	VersionRequestPacket version_request;
+	if (!SendPacket(version_request, socket))
+	{
+		return -1;
+	}
+	VersionResponsePacket version_response;
+	if (!GetPacket(version_response, socket))
+	{
+		return -1;
+	}
+	cout << "CE30-D Version: " << version_response.GetVersionString() << endl;
+	StartRequestPacket start_request;
+	if (!SendPacket(start_request, socket))
+	{
+		return -1;
+	}
+
+	// Now it's ready to receive measurement data
 	Packet packet;
 	Scan scan;
-	printf ("Loop:\n");
-	float sum = 0.0f;
-	float sum_old = 0.0f;
 
-	std::chrono::duration<float, std::milli> elapsed_sum;
-	unsigned number_of_iterations = 1000;
-	for (unsigned i = 0; i < number_of_iterations; ++i)
+	uint32_t iterations = 0;
+	double time_sum = 0;
+	clock_t time_delta = 0;
+	clock_t time0 = 0;
+
+	while (true)
 	{
-		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-		if (!GetPacket (packet, socket)){continue;}
-		unique_ptr<ParsedPacket> parsed = packet.Parse();
-		if (!parsed){continue;}
-		scan.AddColumnsFromPacket (*parsed);
-		if (!scan.Ready()){continue;}//Is frame is complete
-		float * p = points;
-		sum = 0.0f;
-		for (int x = 0; x < scan.Width(); ++x)
+		if (!GetPacket(packet, socket))
 		{
-			for (int y = 0; y < scan.Height(); ++y)
-			{
-				Channel channel = scan.at(x, y);
-				p[0] = channel.point().x;
-				p[2] = channel.point().y;
-				p[1] = channel.point().z;
-				p[3] = 1.0f;
-				p += 4;
-				sum += p[0] + p[1] + p[2] + p[3];
-			}
+			continue;
 		}
-		uint32_t x;
-		memcpy (&x, &sum, sizeof (float));
-		printf ("Checksum: %016x\n", x);
-		if (sum == sum_old){continue;}
-		sum_old = sum;
-		scan.Reset();
-		std::chrono::duration<float, std::milli> elapsed = std::chrono::high_resolution_clock::now() - start;
-		elapsed_sum += elapsed;
-		printf ("millisecond ticks %6.2f\n", elapsed.count());
+		unique_ptr<ParsedPacket> parsed = packet.Parse();
+		if (parsed)
+		{
+			scan.AddColumnsFromPacket(*parsed);
+			if (!scan.Ready())
+			{
+				continue;
+			}
+			for (int x = 0; x < scan.Width(); ++x)
+			{
+				for (int y = 0; y < scan.Height(); ++y)
+				{
+					//Channel channel = scan.at(x, y);
+					//printf ("%f %f %f\n", channel.point().x, channel.point().y, channel.point().z);
+				}
+			}
+
+			iterations++;
+			time_delta = clock() - time0;
+			time0 = clock();
+			double d = (double)(time_delta) / CLOCKS_PER_SEC;
+			time_sum += d;
+			printf ("delta: %lf10.7\n", d);
+			printf ("d avg: %lf10.7\n", time_sum / iterations);
+
+			scan.Reset();
+		}
 	}
-	printf ("average millisecond ticks %f\n", elapsed_sum.count() / (float)number_of_iterations);
+	StopRequestPacket stop_request;
+	SendPacket(stop_request, socket);
 }
