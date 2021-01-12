@@ -1,5 +1,3 @@
-#ifdef UDP_SOCKET_USE_BOOST_API
-
 #include "udp_socket.h"
 #include <chrono>
 #include <iostream>
@@ -72,5 +70,3 @@ Diagnose UDPSocket::GetPacketThreadSafe(
   return diagnose;
 }
 } // namespace ce30_driver
-
-#endif
