@@ -1,6 +1,7 @@
 #include <iostream>
 #include <ce30_driver/ce30_driver.h>
 #include <unistd.h>
+#include <time.h>
 #include "../csc/csc_debug.h"
 
 using namespace std;
@@ -11,12 +12,12 @@ int main()
 {
 
 	{
-		clock_t t0 = clock();
+		struct timespec begin, end;
+		clock_gettime (CLOCK_MONOTONIC_RAW, &begin);
 		sleep(1);
-		clock_t t1 = clock();
-		double d = (t1-t0) / CLOCKS_PER_SEC;
-		printf ("d: %lf\n", d);
-		ASSERTF ((d < 1.0001) && (d > 0.9999), "clock() and CLOCKS_PER_SEC not right");
+		clock_gettime (CLOCK_MONOTONIC_RAW, &end);
+		double d = ((end.tv_nsec - begin.tv_nsec) / 1000000000.0) + (end.tv_sec  - begin.tv_sec);
+		ASSERTF ((d < 1.1) && (d > 0.9), "clock() and CLOCKS_PER_SEC not right. d = %lf, CLOCKS_PER_SEC=%i", d, CLOCKS_PER_SEC);
 	}
 
 
@@ -48,9 +49,10 @@ int main()
 
 	uint32_t iterations = 0;
 	double time_sum = 0;
-	clock_t time_delta = 0;
-	clock_t time0 = 0;
+	struct timespec ts0;
+	struct timespec ts1;
 
+	clock_gettime (CLOCK_MONOTONIC_RAW, &ts0);
 	while (true)
 	{
 		if (!GetPacket(packet, socket))
@@ -73,16 +75,18 @@ int main()
 					//printf ("%f %f %f\n", channel.point().x, channel.point().y, channel.point().z);
 				}
 			}
-
-			iterations++;
-			time_delta = clock() - time0;
-			time0 = clock();
-			double d = (double)(time_delta) / CLOCKS_PER_SEC;
-			time_sum += d;
-			printf ("delta: %lf10.7\n", d);
-			printf ("d avg: %lf10.7\n", time_sum / iterations);
-
 			scan.Reset();
+			
+			{
+				clock_gettime (CLOCK_MONOTONIC_RAW, &ts1);
+				double d = ((ts1.tv_nsec - ts0.tv_nsec) / 1000000000.0) + (ts1.tv_sec  - ts0.tv_sec);
+				iterations++;
+				time_sum += d;
+				printf ("delta: %lf10.7\n", d);
+				printf ("d avg: %lf10.7\n", time_sum / iterations);
+				clock_gettime (CLOCK_MONOTONIC_RAW, &ts0);
+			}
+			
 		}
 	}
 	StopRequestPacket stop_request;

@@ -1,15 +1,5 @@
-#sudo apt-get update
-#sudo apt-get install build-essential
-#sudo apt-get install libboost-all-dev
-g++ -c -I.. ../ce30_driver/utils.cpp
-g++ -c -I.. ../ce30_driver/udp_socket.cpp
-g++ -c -I.. ../ce30_driver/timed_udp_socket.cpp
-g++ -c -I.. ../ce30_driver/data_types.cpp
-g++ -c -I.. ../ce30_driver/packet.cpp
-g++ -c -I.. ../ce30_driver/udp_server.cpp
-g++ -c -I.. ce30_demo2.cpp
-g++ udp_socket.o utils.o timed_udp_socket.o data_types.o packet.o udp_server.o ce30_demo2.o -lboost_system -lm -pthread
-
+g++ -oce30_demo ce30_demo.cpp -I.. -lce30_driver -lboost_system -lpthread
+g++ -oce30_demo2 ce30_demo2.cpp -I.. -lce30_driver -lboost_system -lpthread
 
 #g++ -Wl,--dynamicbase,--high-entropy-va,--nxcompat,--default-image-base-high -Wl,-subsystem,console -mthreads -o 
 #debug/ce30_demo.exe debug/utils.o debug/udp_socket.o debug/udp_socket_win_impl.o debug/timed_udp_socket.o 
