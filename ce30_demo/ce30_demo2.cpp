@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <time.h>
 #include "../csc/csc_debug.h"
+#include "../csc/csc_crossos.h"
 
 using namespace std;
 using namespace ce30_driver;
@@ -10,14 +11,15 @@ using namespace ce30_driver;
 
 int main()
 {
+	csc_crossos_enable_ansi_color();
 
 	{
 		struct timespec begin, end;
-		clock_gettime (CLOCK_MONOTONIC_RAW, &begin);
+		clock_gettime (CLOCK_REALTIME, &begin);
 		sleep(1);
-		clock_gettime (CLOCK_MONOTONIC_RAW, &end);
+		clock_gettime (CLOCK_REALTIME, &end);
 		double d = ((end.tv_nsec - begin.tv_nsec) / 1000000000.0) + (end.tv_sec  - begin.tv_sec);
-		ASSERTF ((d < 1.1) && (d > 0.9), "clock() and CLOCKS_PER_SEC not right. d = %lf, CLOCKS_PER_SEC=%i", d, CLOCKS_PER_SEC);
+		ASSERTF ((d < 1.1) && (d > 0.9), "clock_gettime not right. d = %lf", d);
 	}
 
 
@@ -52,7 +54,7 @@ int main()
 	struct timespec ts0;
 	struct timespec ts1;
 
-	clock_gettime (CLOCK_MONOTONIC_RAW, &ts0);
+	clock_gettime (CLOCK_REALTIME, &ts0);
 	while (true)
 	{
 		if (!GetPacket(packet, socket))
@@ -78,13 +80,13 @@ int main()
 			scan.Reset();
 			
 			{
-				clock_gettime (CLOCK_MONOTONIC_RAW, &ts1);
+				clock_gettime (CLOCK_REALTIME, &ts1);
 				double d = ((ts1.tv_nsec - ts0.tv_nsec) / 1000000000.0) + (ts1.tv_sec  - ts0.tv_sec);
 				iterations++;
 				time_sum += d;
 				printf ("delta: %lf10.7\n", d);
 				printf ("d avg: %lf10.7\n", time_sum / iterations);
-				clock_gettime (CLOCK_MONOTONIC_RAW, &ts0);
+				clock_gettime (CLOCK_REALTIME, &ts0);
 			}
 			
 		}
