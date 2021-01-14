@@ -35,3 +35,30 @@ Dark red,green,blue is origin orientation. Bright red,green,blue is ground orien
 ![setup](setup.png)
 
 
+
+
+## Installing on Windows MSYS2
+
+* https://www.msys2.org/
+
+
+```
+pacman -S mingw-w64-x86_64-qt-creator
+pacman -S mingw-w64-x86_64-toolchain
+pacman -S mingw-w64-x86_64-toolchain
+pacman -S mingw-w64-x86_64-cmake
+pacman -S mingw-w64-x86_64-cmake
+pacman -S mingw-w64-x86_64-make
+pacman -S mingw-w64-x86_64-boost
+```
+
+```
+git clone https://github.com/nanomsg/nng
+mkdir build
+cd build
+cmake .. -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=$MINGW_PREFIX
+mingw32-make
+mingw32-make install
+```
+
+
