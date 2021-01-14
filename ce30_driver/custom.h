@@ -32,12 +32,25 @@ void ce30_scan_to_frame (ce30_driver::Scan scan, float frame[CE30_WIDTH*CE30_HIE
 		for (int y = 0; y < CE30_HIEGHT; ++y)
 		{
 			ce30_driver::Channel channel = scan.at(x, y);
-			frame[CE30_XY_INDEX(x,y) + 0] = channel.point().x;
-			frame[CE30_XY_INDEX(x,y) + 1] = channel.point().x;
-			frame[CE30_XY_INDEX(x,y) + 2] = channel.point().x;
-			frame[CE30_XY_INDEX(x,y) + 3] = channel.amplitude;
+			frame[CE30_XY_INDEX(x,y)*4 + 0] = channel.point().x;
+			frame[CE30_XY_INDEX(x,y)*4 + 1] = channel.point().y;
+			frame[CE30_XY_INDEX(x,y)*4 + 2] = channel.point().z;
+			frame[CE30_XY_INDEX(x,y)*4 + 3] = channel.amplitude;
 		}
 	}
 }
 
 
+double ce30_scan_frame_amplitude (ce30_driver::Scan scan)
+{
+	float sum = 0;
+	for (int x = 0; x < CE30_WIDTH; ++x)
+	{
+		for (int y = 0; y < CE30_HIEGHT; ++y)
+		{
+			ce30_driver::Channel channel = scan.at(x, y);
+			sum += channel.amplitude;
+		}
+	}
+	return sum / (CE30_WIDTH*CE30_HIEGHT);
+}

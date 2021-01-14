@@ -86,7 +86,7 @@ int main (int argc, char const * argv[])
 
 	if (arg_flags & ARG_VERBOSE)
 	{
-		printf ("%10s %10s %10s %10s %10s\n", "frame", "duration", "spf", "fps", "avg_fps");
+		printf ("%10s %10s %10s %10s %10s %10s\n", "frame", "duration", "spf", "fps", "avg_fps", "frame_amp");
 	}
 	clock_gettime (CLOCK_REALTIME, &ts0);
 	clock_gettime (CLOCK_REALTIME, &ts1);
@@ -113,9 +113,6 @@ int main (int argc, char const * argv[])
 		ce30_scan_to_frame (scan, frame);
 		int r = fwrite (frame, CE30_WIDTH*CE30_HIEGHT*4, 1, file_out);
 		ASSERT (r == 1);
-		scan.Reset();
-
-
 
 		struct timespec ts2;
 		clock_gettime (CLOCK_REALTIME, &ts2);
@@ -127,17 +124,22 @@ int main (int argc, char const * argv[])
 
 		if (arg_flags & ARG_VERBOSE)
 		{
-			printf ("%10u %10.2lf %10.8lf %10.6lf %10.6lf\n", counter, d10, d21, 1.0 / d21, (double)counter / d10);
+			float s = ce30_scan_frame_amplitude (scan);
+			printf ("%10u %10.2lf %10.8lf %10.6lf %10.6lf %10.5f\n", counter, d10, d21, 1.0 / d21, (double)counter / d10, s);
 		}
 		if (arg_duration > 0.0 && d10 > arg_duration)
 		{
 			if (arg_flags & ARG_VERBOSE)
 			{
-				printf ("%10s %10s %10s %10s %10s\n", "frame", "duration", "spf", "fps", "avg_fps");
+				printf ("%10s %10s %10s %10s %10s %10s\n", "frame", "duration", "spf", "fps", "avg_fps", "frame_amp");
 			}
 			printf ("The recording has ended because it had limited recording duration\n");
 			break;
 		}
+
+
+
+		scan.Reset();
 	}
 	StopRequestPacket stop_request;
 	SendPacket (stop_request, socket);
