@@ -111,7 +111,7 @@ int main (int argc, char const * argv[])
 
 		float frame[CE30_WIDTH*CE30_HIEGHT*4] = {0};
 		ce30_scan_to_frame (scan, frame);
-		int r = fwrite (frame, CE30_WIDTH*CE30_HIEGHT*4, 1, file_out);
+		int r = fwrite (frame, sizeof (frame), 1, file_out);
 		ASSERT (r == 1);
 
 		struct timespec ts2;
@@ -133,7 +133,7 @@ int main (int argc, char const * argv[])
 			{
 				printf ("%10s %10s %10s %10s %10s %10s\n", "frame", "duration", "spf", "fps", "avg_fps", "frame_amp");
 			}
-			printf ("The recording has ended because it had limited recording duration\n");
+			printf ("The recording ended after %ds. Recording duration was set to %d\n", d10, arg_duration);
 			break;
 		}
 
