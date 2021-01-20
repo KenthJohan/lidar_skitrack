@@ -64,8 +64,8 @@ int main()
 			{
 				for (int y = 0; y < scan.Height(); ++y)
 				{
-					//Channel channel = scan.at(x, y);
-					//printf ("%f %f %f\n", channel.point().x, channel.point().y, channel.point().z);
+					Channel channel = scan.at(x, y);
+					printf ("%10.5f %10.5f %10.5f %02x\n", channel.point().x, channel.point().y, channel.point().z, channel.amp_raw);
 				}
 			}
 			scan.Reset();

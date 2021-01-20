@@ -10,9 +10,7 @@
 #include "../csc/csc_debug.h"
 #include "../csc/csc_argv.h"
 
-#define CE30_WIDTH 320
-#define CE30_HIEGHT 20
-#define CE30_XY_INDEX(x,y) ((x)*CE30_HIEGHT + (y))
+
 
 enum ce30_outformat
 {
