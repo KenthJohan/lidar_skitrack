@@ -7,6 +7,7 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
 
 #include <nng/nng.h>
 #include <nng/protocol/pair0/pair.h>
+#include <nng/protocol/pair1/pair.h>
 #include <nng/supplemental/util/platform.h>
 
 #include <stdio.h>
@@ -691,6 +692,12 @@ enum visual_line
 #define VISUAL_MODE_IMG3     UINT32_C(0x00000003)
 
 
+struct eavnet_pointcloud
+{
+	uint32_t entity;
+	uint32_t attribute;
+	float pointpos[LIDAR_WH*POINT_STRIDE*2];
+};
 
 
 /*
@@ -810,7 +817,40 @@ void show (const char * filename, nng_socket socks[], uint32_t visual_mode)
 
 	//Send visual information to the graphic server:
 	{
-		int r;
+		for (int i = 0; i < LIDAR_WH*2; ++i)
+		{
+			//pointpos[i + 0] = 10.0f;
+			//pointpos[i + 1] = 10.0f;
+			//pointpos[i + 2] = 10.0f;
+			pointpos[i*POINT_STRIDE + 3] = 10.0f;
+		}
+
+
+		{
+			nng_msg * msg;
+			nng_msg_alloc (&msg, 0);
+			nng_msg_append_u32 (msg, 3);
+			nng_msg_append_u32 (msg, 0);
+			nng_msg_append (msg, &(uint32_t){LIDAR_WH*2}, sizeof(uint32_t));
+			int r;
+			r = nng_sendmsg (socks[MAIN_NNGSOCK_POINTCLOUD_POS], msg, 0);
+			if (r) {perror (nng_strerror (r));}
+		}
+
+		{
+			nng_msg * msg;
+			nng_msg_alloc (&msg, 0);
+			nng_msg_append_u32 (msg, 3);
+			nng_msg_append_u32 (msg, 2);
+			nng_msg_append (msg, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2);
+			int r;
+			r = nng_sendmsg (socks[MAIN_NNGSOCK_POINTCLOUD_POS], msg, 0);
+			if (r) {perror (nng_strerror (r));}
+		}
+
+
+
+		/*
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_POS], linepos1, VISUAL_LINE_COUNT*POINT_STRIDE*2*sizeof(float), 0);
 		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_COL], linecol1, VISUAL_LINE_COUNT*2*sizeof(uint32_t), 0);
@@ -821,6 +861,7 @@ void show (const char * filename, nng_socket socks[], uint32_t visual_mode)
 		if (r) {perror (nng_strerror (r));}
 		r = nng_send (socks[MAIN_NNGSOCK_GROUNDPROJECTION], imgv, IMG_XN*IMG_YN*sizeof(uint32_t), 0);
 		if (r) {perror (nng_strerror (r));}
+		*/
 	}
 
 }
