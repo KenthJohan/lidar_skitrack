@@ -1,6 +1,3 @@
-[submodule "csc"]
-	path = csc
-	url = https://github.com/KenthJohan/csc
 [submodule "detection/csc"]
 	path = detection/csc
 	url = https://github.com/KenthJohan/csc
