@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "csc_malloc_file.h"
+#include "csc/csc_malloc_file.h"
 
 void points_read (char const s[], float p[], uint32_t *n)
 {

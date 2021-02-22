@@ -21,35 +21,31 @@
 #include <OpenBLAS/lapacke.h>
 #include <OpenBLAS/cblas.h>
 
-#include "csc_debug_nng.h"
-#include "csc_crossos.h"
-#include "csc_malloc_file.h"
-#include "csc_math.h"
-#include "csc_linmat.h"
-#include "csc_m3f32.h"
-#include "csc_m4f32.h"
-#include "csc_v3f32.h"
-#include "csc_v4f32.h"
-#include "csc_qf32.h"
-#include "csc_filecopy.h"
+#include "csc/csc_debug_nng.h"
+#include "csc/csc_crossos.h"
+#include "csc/csc_malloc_file.h"
+#include "csc/csc_math.h"
+#include "csc/csc_linmat.h"
+#include "csc/csc_m3f32.h"
+#include "csc/csc_m4f32.h"
+#include "csc/csc_v3f32.h"
+#include "csc/csc_v4f32.h"
+#include "csc/csc_qf32.h"
+#include "csc/csc_filecopy.h"
 
 #include "../shared/shared.h"
 #include "calculation.h"
+#include "mg_send.h"
 
 
-
+//../txtpoints/4/14_17_18_225279.txt
 int main (int argc, char const * argv[])
 {
 	ASSERT (argc);
 	ASSERT (argv);
 	csc_crossos_enable_ansi_color();
-	nng_socket socks[MAIN_NNGSOCK_COUNT] = {{0}};
-	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_POS,   "tcp://localhost:9002");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_POINTCLOUD_COL,   "tcp://localhost:9003");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_GROUNDPROJECTION, "tcp://localhost:9004");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_VOXEL,            "tcp://localhost:9005");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_POS,         "tcp://localhost:9006");
-	main_nng_pairdial (socks + MAIN_NNGSOCK_LINE_COL,         "tcp://localhost:9007");
+	nng_socket sock;
+	mg_pairdial (&sock,"tcp://localhost:9002");
 	ASSERT_PARAM_NOTNULL (argv[1]);
 	uintmax_t visual_mode = VISUAL_MODE_IMG1;
 	if (argc >= 3 && argv[2])
@@ -58,12 +54,7 @@ int main (int argc, char const * argv[])
 		visual_mode = strtoumax (argv[2], &e, 0);
 		ASSERT (visual_mode <= UINT32_MAX);
 	}
-	show (argv[1], socks, (uint32_t)visual_mode);
-	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_POS]);
-	nng_close (socks[MAIN_NNGSOCK_POINTCLOUD_COL]);
-	nng_close (socks[MAIN_NNGSOCK_GROUNDPROJECTION]);
-	nng_close (socks[MAIN_NNGSOCK_VOXEL]);
-	nng_close (socks[MAIN_NNGSOCK_LINE_POS]);
-	nng_close (socks[MAIN_NNGSOCK_LINE_COL]);
+	show (argv[1], sock, (uint32_t)visual_mode);
+	nng_close (sock);
 	return 0;
 }
