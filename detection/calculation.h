@@ -282,22 +282,43 @@ void show (const char * filename, nng_socket sock, uint32_t visual_mode)
 		mg_send (sock, MYENT_TEXTURE1, MG_TEXTURE, &(component_texture){0, IMG_XN, IMG_YN, 1}, sizeof(component_texture));
 		mg_send (sock, MYENT_TEXTURE2, MG_TEXTURE, &(component_texture){0, IMG_XN, IMG_YN, 1}, sizeof(component_texture));
 		mg_send (sock, MYENT_MESH_RECTANGLE, MG_COUNT, &(component_count){6}, sizeof(component_count));
-		mg_send (sock, MYENT_MESH_RECTANGLE, MG_RECTANGLE, &(component_rectangle){1.0f, 1.0f}, sizeof(component_rectangle));
+		mg_send (sock, MYENT_MESH_RECTANGLE, MG_RECTANGLE, &(component_rectangle){IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE}, sizeof(component_rectangle));
 
 		mg_send (sock, MYENT_DRAW_CLOUD, MG_COUNT, &(component_count){LIDAR_WH*2}, sizeof(component_count));
 		mg_send (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2);
 
-		mg_send (sock, MYENT_DRAW_IMG1, MG_POSITION,&(component_position){s1.centroid[0], s1.centroid[1], s1.centroid[2], 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG1, MG_SCALE, &(component_position){IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE, 0.0f, 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG1, MG_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
-		mg_send (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE1}, sizeof (uint32_t));
 
-		mg_send (sock, MYENT_DRAW_IMG2, MG_POSITION,&(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG2, MG_SCALE, &(component_position){IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE, 0.0f, 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG2, MG_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
-		mg_send (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
-		mg_send (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE2}, sizeof (uint32_t));
+		{
+			float m[4*4] = {0.0f};
+			//m4f32_identity (m);
+			m4f32_translation (m, s1.centroid);
+			m[M4_02] = s1.c[0];
+			m[M4_12] = s1.c[1];
+			m[M4_22] = s1.c[2];
+
+			m[M4_00] = s1.c[3];
+			m[M4_10] = s1.c[4];
+			m[M4_20] = s1.c[5];
+
+			m[M4_01] = s1.c[6];
+			m[M4_11] = s1.c[7];
+			m[M4_21] = s1.c[8];
+
+			m[M4_33] = 1.0f;
+			m4f32_print(m, stdout);
+			mg_send (sock, MYENT_DRAW_IMG1, MG_TRANSFORM, m, sizeof (component_transform));
+			mg_send (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
+			mg_send (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE1}, sizeof (uint32_t));
+		}
+
+
+		{
+			mg_send (sock, MYENT_DRAW_IMG2, MG_POSITION,&(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
+			mg_send (sock, MYENT_DRAW_IMG2, MG_SCALE, &(component_position){1.0f, 1.0f, 0.0f, 1.0f}, sizeof (component_position));
+			mg_send (sock, MYENT_DRAW_IMG2, MG_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
+			mg_send (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
+			mg_send (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE2}, sizeof (uint32_t));
+		}
 
 		/*
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_POS], linepos1, VISUAL_LINE_COUNT*POINT_STRIDE*2*sizeof(float), 0);

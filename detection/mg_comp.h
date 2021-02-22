@@ -11,6 +11,7 @@ typedef qf32 component_quaternion;
 typedef v4f32 component_applyrotation;
 typedef v2f32 component_uv;
 typedef v2f32 component_rectangle;
+typedef m4f32 component_transform;
 typedef struct component_controller
 {
 	const uint8_t * keyboard; //SDL Keyboard

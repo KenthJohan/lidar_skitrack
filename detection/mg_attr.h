@@ -13,6 +13,7 @@ enum mg_attr
 	MG_QUATERNION,
 	MG_POSITION,
 	MG_RECTANGLE,
+	MG_TRANSFORM,
 };
 
 
