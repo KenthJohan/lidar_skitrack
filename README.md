@@ -62,3 +62,26 @@ mingw32-make install
 ```
 
 
+## Installing on Linux
+```
+sudo apt-get install libblas-dev
+sudo apt-get install libcblas-dev
+sudo apt-get install liblapacke-dev
+
+sudo apt-get install cmake
+git clone https://github.com/nanomsg/nng
+mkdir build
+cd build
+sudo cmake ..
+sudo make
+sudo make test
+sudo make install
+sudo ldconfig
+
+
+```
+
+
+
+
+
