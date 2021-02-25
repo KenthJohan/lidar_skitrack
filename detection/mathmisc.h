@@ -11,7 +11,6 @@
 //sudo apt-get install libblas-dev
 //sudo apt-get install libopenblas-dev
 //sudo apt-get install liblapacke-dev
-#include <lapack.h>
 #include <lapacke.h>
 #include <cblas.h>
 #endif
