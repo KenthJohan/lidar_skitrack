@@ -76,11 +76,9 @@ int main (int argc, char const * argv[])
 	{
 		while (1)
 		{
-			int r1;
-			r1 = read (STDIN_FILENO, s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE);
-			printf ("r1 %i\n", r1);
 			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, stdin);
 			ASSERTF (r == 1, "%i", r);
+			s1.pc_count = LIDAR_WH;
 			show (&s1, &s2, sock, arg_visualmode);
 			sleep(10);
 		}
