@@ -337,7 +337,7 @@ static void points_test_sinus_slope (float points[])
 	//Test sinus slopes:
 	for (float * p = points; p < points + LIDAR_WH*POINT_STRIDE; p += POINT_STRIDE)
 	{
-		p[2] += 0.6f * sin (1.0f*p[1]);
+		p[2] += 0.2f * sin (4.0f*p[1]);
 	}
 }
 

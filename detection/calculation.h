@@ -22,39 +22,6 @@
 
 
 
-struct gobj_line
-{
-	nng_socket sock;
-	uint32_t cap;
-	uint32_t last;
-	float * lines;//Stride=4
-};
-
-void gobj_line_push (struct gobj_line * obj, float x, float y, float z)
-{
-	float * lines = obj->lines + obj->last * 4;
-	lines[0] = x;
-	lines[1] = y;
-	lines[2] = z;
-	lines[3] = 1.0f;
-	obj->last++;
-}
-
-
-void gobj_line_send (struct gobj_line * obj)
-{
-	int r;
-	r = nng_send (obj->sock, obj->lines, obj->last*4*sizeof(float), 0);
-	if (r)
-	{
-		perror (nng_strerror (r));
-	}
-}
-
-
-
-
-
 uint32_t rgba_value (float value, float kr, float kg, float kb)
 {
 	uint32_t r = CLAMP (value*kr, 0.0f, 255.0f);
@@ -275,6 +242,8 @@ void show (const char * filename, nng_socket sock, uint32_t visual_mode)
 			//pointpos[i + 2] = 10.0f;
 			pointpos[i*POINT_STRIDE + 3] = 10.0f;
 		}
+
+		//points_test_sinus_slope(pointpos);
 
 		mg_send_add (sock, MYENT_MESH_RECTANGLE, MG_MESH);
 		mg_send_add (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD);
