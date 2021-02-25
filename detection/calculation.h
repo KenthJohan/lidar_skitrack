@@ -118,6 +118,51 @@ enum visual_line
 
 
 
+void show_init (nng_socket sock)
+{
+
+	mg_send_add (sock, MYENT_MESH_RECTANGLE, MG_MESH);
+	mg_send_add (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD);
+
+	{
+		component_texture t1 = {0, IMG_XN, IMG_YN, 1};
+		component_texture t2 = {0, IMG_XN, IMG_YN, 1};
+		mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE, &t1, sizeof(component_texture));
+		mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE, &t2, sizeof(component_texture));
+	}
+
+	{
+		component_count c = 6;
+		component_rectangle r = {IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE};
+		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_COUNT, &c, sizeof(component_count));
+		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_RECTANGLE, &r, sizeof(component_rectangle));
+	}
+
+	{
+		component_count c = LIDAR_WH*2;
+		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_COUNT, &c, sizeof(component_count));
+	}
+
+	{
+		mg_send_add (sock, MYENT_DRAW_IMG2, MG_TRANSFORM);
+		component_position p = {0.0f, 0.0f, 0.0f, 1.0f};
+		component_position s = {1.0f, 1.0f, 0.0f, 1.0f};
+		component_position q = {0.0f, 0.0f, 0.0f, 1.0f};
+		uint32_t mesh = MYENT_MESH_RECTANGLE;
+		uint32_t texture = MYENT_TEXTURE1;
+		mg_send_set (sock, MYENT_DRAW_IMG2, MG_POSITION, p, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG2, MG_SCALE, s, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG2, MG_QUATERNION, q, sizeof (component_position));
+
+		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
+		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
+		mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
+		mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
+	}
+
+}
+
+
 /*
 	 1: Read filename                   : (Filename) -> (text 3D points)
 	 2: Convert text points to f32      : (text 3D points) -> (3D points)
@@ -137,35 +182,32 @@ enum visual_line
 	16: Find all peaks                  : (1D image) -> ((position), (strength))
 	17: Output of skitrack position     : ((position), (strength))
 */
-void show (const char * filename, nng_socket sock, uint32_t visual_mode)
+void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t visual_mode)
 {
-	struct skitrack1 s1 = {0};
-	struct skitrack2 s2 = {0};
-
 	float pointpos[LIDAR_WH*POINT_STRIDE*2];
-	uint32_t pointcol[LIDAR_WH*2] = {RGBA (0xFF, 0xFF, 0xFF, 0xFF)};//The color of each point. This is only used for visualization.
+	uint32_t pointcol[LIDAR_WH*2] = {0xFFFFFFFF};//The color of each point. This is only used for visualization.
 	uint32_t imgv[IMG_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
 
 
-	points_read_filename (filename, s1.pc, &s1.pc_count);
-	//points_test_sinus_slope (s1.pc);
 
-	memcpy (pointpos, s1.pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
-	skitrack1_process (&s1);
-	skitrack2_process (&s2, s1.pc, s1.pc_count);
-	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1.pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	//points_test_sinus_slope (s1->pc);
+
+	memcpy (pointpos, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	skitrack1_process (s1);
+	skitrack2_process (s2, s1->pc, s1->pc_count);
+	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
 	//Visualize the skitrack and more information:
 	switch (visual_mode & VISUAL_MODE_IMG_MASK)
 	{
 	case VISUAL_MODE_IMG1:
-		image_visual (imgv, s2.img1, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		image_visual (imgv, s2->img1, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
 		break;
 	case VISUAL_MODE_IMG2:
-		image_visual (imgv, s2.img2, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		image_visual (imgv, s2->img2, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
 		break;
 	case VISUAL_MODE_IMG3:
-		image_visual (imgv, s2.img3, IMG_XN, IMG_YN, s2.q1, s2.q2, s2.g, SKITRACK2_PEAKS_COUNT, s2.k);
+		image_visual (imgv, s2->img3, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
 		break;
 	}
 
@@ -187,11 +229,11 @@ void show (const char * filename, nng_socket sock, uint32_t visual_mode)
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].b, 0.0f, 0.0f, 1.0f);
 
 	vf32_set3 (linepos1[VISUAL_LINE_PCA_0].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_0].b, s1.c[0], s1.c[1], s1.c[2]);
+	vf32_set3 (linepos1[VISUAL_LINE_PCA_0].b, s1->c[0], s1->c[1], s1->c[2]);
 	vf32_set3 (linepos1[VISUAL_LINE_PCA_1].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_1].b, s1.c[3], s1.c[4], s1.c[5]);
+	vf32_set3 (linepos1[VISUAL_LINE_PCA_1].b, s1->c[3], s1->c[4], s1->c[5]);
 	vf32_set3 (linepos1[VISUAL_LINE_PCA_2].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_2].b, s1.c[6], s1.c[7], s1.c[8]);
+	vf32_set3 (linepos1[VISUAL_LINE_PCA_2].b, s1->c[6], s1->c[7], s1->c[8]);
 
 
 
@@ -217,17 +259,17 @@ void show (const char * filename, nng_socket sock, uint32_t visual_mode)
 	}
 
 	{
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2.g[0] - 10.0f * s2.k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2.g[0] + 30.0f * s2.k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2.g[1] - 10.0f * s2.k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2.g[1] + 30.0f * s2.k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[0] - 10.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[0] + 30.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[1] - 10.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[1] + 30.0f * s2->k);
 		float rot[3*3];
-		memcpy (rot, s1.r, sizeof (rot));
+		memcpy (rot, s1->r, sizeof (rot));
 		m3f32_lapacke_inverse (rot, 3);
 		for (float * i = linepos1[VISUAL_LINE_SKITRACK+0].a; i <= linepos1[VISUAL_LINE_SKITRACK_END].b; i += POINT_STRIDE)
 		{
 			mv3f32_mul (i, rot, i);
-			vvf32_add (4, i, i, s1.centroid);
+			vvf32_add (4, i, i, s1->centroid);
 		}
 	}
 
@@ -245,49 +287,29 @@ void show (const char * filename, nng_socket sock, uint32_t visual_mode)
 
 		//points_test_sinus_slope(pointpos);
 
-		mg_send_add (sock, MYENT_MESH_RECTANGLE, MG_MESH);
-		mg_send_add (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD);
-
-		mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE, &(component_texture){0, IMG_XN, IMG_YN, 1}, sizeof(component_texture));
-		mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE, &(component_texture){0, IMG_XN, IMG_YN, 1}, sizeof(component_texture));
 		mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE_CONTENT, imgv, IMG_XN*IMG_YN*sizeof(uint32_t));
-
-		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_COUNT, &(component_count){6}, sizeof(component_count));
-		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_RECTANGLE, &(component_rectangle){IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE}, sizeof(component_rectangle));
-
-		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_COUNT, &(component_count){LIDAR_WH*2}, sizeof(component_count));
 		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2);
-
 
 		{
 			float m[4*4] = {0.0f};
 			//m4f32_identity (m);
-			m4f32_translation (m, s1.centroid);
-			m[M4_02] = s1.c[0];//Column 2
-			m[M4_12] = s1.c[1];//Column 2
-			m[M4_22] = s1.c[2];//Column 2
-			m[M4_00] = s1.c[3];//Column 0
-			m[M4_10] = s1.c[4];//Column 0
-			m[M4_20] = s1.c[5];//Column 0
-			m[M4_01] = s1.c[6];//Column 1
-			m[M4_11] = s1.c[7];//Column 1
-			m[M4_21] = s1.c[8];//Column 1
+			m4f32_translation (m, s1->centroid);
+			m[M4_02] = s1->c[0];//Column 2
+			m[M4_12] = s1->c[1];//Column 2
+			m[M4_22] = s1->c[2];//Column 2
+			m[M4_00] = s1->c[3];//Column 0
+			m[M4_10] = s1->c[4];//Column 0
+			m[M4_20] = s1->c[5];//Column 0
+			m[M4_01] = s1->c[6];//Column 1
+			m[M4_11] = s1->c[7];//Column 1
+			m[M4_21] = s1->c[8];//Column 1
 			m[M4_33] = 1.0f;
 			m4f32_print(m, stdout);
 			mg_send_set (sock, MYENT_DRAW_IMG1, MG_TRANSFORM, m, sizeof (component_transform));
-			mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
-			mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE1}, sizeof (uint32_t));
 		}
 
 
-		{
-			mg_send_add (sock, MYENT_DRAW_IMG2, MG_TRANSFORM);
-			mg_send_set (sock, MYENT_DRAW_IMG2, MG_POSITION,&(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
-			mg_send_set (sock, MYENT_DRAW_IMG2, MG_SCALE, &(component_position){1.0f, 1.0f, 0.0f, 1.0f}, sizeof (component_position));
-			mg_send_set (sock, MYENT_DRAW_IMG2, MG_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, sizeof (component_position));
-			mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, sizeof (uint32_t));
-			mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE1}, sizeof (uint32_t));
-		}
+
 
 		/*
 		r = nng_send (socks[MAIN_NNGSOCK_LINE_POS], linepos1, VISUAL_LINE_COUNT*POINT_STRIDE*2*sizeof(float), 0);

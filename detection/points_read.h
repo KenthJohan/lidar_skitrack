@@ -29,7 +29,7 @@ void points_read (char const s[], float p[], uint32_t *n)
 }
 
 
-void points_read_filename (char const * filename, float p[], uint32_t *n)
+void legacy_points_read_filename (char const * filename, float p[], uint32_t *n)
 {
 	ASSERT_PARAM_NOTNULL (filename);
 	ASSERT_PARAM_NOTNULL (p);

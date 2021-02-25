@@ -1,0 +1,12 @@
+g++ detection_ce30.c -odetection_ce30 \
+-I.. \
+-lce30_driver \
+-lboost_system \
+-DNNG_STATIC_LIB \
+-lnng \
+-latomic \
+-llapacke \
+-llapack \
+-lblas \
+-lm \
+-lpthread

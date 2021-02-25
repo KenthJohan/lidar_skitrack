@@ -1,4 +1,4 @@
-gcc pointfile.c -odetection_linux64 \
+gcc detection_file.c -odetection_file \
 -DNNG_STATIC_LIB \
 -lnng \
 -latomic \

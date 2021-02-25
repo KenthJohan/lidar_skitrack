@@ -9,7 +9,7 @@ DEFINES += NNG_STATIC_LIB
 
 QMAKE_CFLAGS += -Wno-unused-function
 
-SOURCES += pointfile.c
+SOURCES += detection_file.c
 HEADERS += calculation.h
 HEADERS += myent.h
 HEADERS += mathmisc.h

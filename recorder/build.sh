@@ -1,0 +1,1 @@
+g++ -oce30_recorder ce30_recorder.cpp -I.. -lce30_driver -lboost_system -lpthread
