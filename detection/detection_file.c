@@ -80,7 +80,6 @@ int main (int argc, char const * argv[])
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
 			show (&s1, &s2, sock, arg_visualmode);
-			sleep(10);
 		}
 	}
 	else if ((arg_flags & ARG_LEGACY_FILENAME) && arg_filename)
