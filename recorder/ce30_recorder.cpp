@@ -28,20 +28,20 @@ int main (int argc, char const * argv[])
 
 	struct csc_argv_option option[] =
 	{
-	{'d', "duration", CSC_ARGV_TYPE_DOUBLE,    &arg_duration,   {.val_umax = 0}, "How long to record"},
-	{'f', "filename", CSC_ARGV_TYPE_STRING,    &arg_filename,   {.val_umax = 0}, "The filename"},
-	{'l', "logfile",  CSC_ARGV_TYPE_STRING,    &arg_logfile,    {.val_umax = 0}, "The log filename"},
-	{'h', "help",     CSC_ARGV_TYPE_U32,       &arg_flags,      {.val_u32 = ARG_HELP}, "Show help"},
-	{'v', "verbose",  CSC_ARGV_TYPE_U32,       &arg_flags,      {.val_u32 = ARG_VERBOSE}, "Show verbose"},
-	{'s', "stdout",  CSC_ARGV_TYPE_U32,        &arg_flags,      {.val_u32 = ARG_STDOUT}, "Outputs pointdata to stdout"},
-	{.type = CSC_ARGV_TYPE_END}};
+	{'d', "duration", CSC_TYPE_DOUBLE,    &arg_duration,   0, "How long to record"},
+	{'f', "filename", CSC_TYPE_STRING,    &arg_filename,   0, "The filename"},
+	{'l', "logfile",  CSC_TYPE_STRING,    &arg_logfile,    0, "The log filename"},
+	{'h', "help",     CSC_TYPE_U32,       &arg_flags,      ARG_HELP, "Show help"},
+	{'v', "verbose",  CSC_TYPE_U32,       &arg_flags,      ARG_VERBOSE, "Show verbose"},
+	{'s', "stdout",  CSC_TYPE_U32,        &arg_flags,      ARG_STDOUT, "Outputs pointdata to stdout"},
+	CSC_ARGV_END};
 
-	csc_argv_parsev (option, argv+1);
+	csc_argv_parseall (argv+1, option);
 
 	if (arg_flags & ARG_HELP)
 	{
-		csc_argv_print_description (option);
-		csc_argv_print_value (option);
+		csc_argv_description0 (option, stdout);
+		csc_argv_description1 (option, stdout);
 		return 0;
 	}
 
