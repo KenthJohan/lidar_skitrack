@@ -49,19 +49,19 @@ int main (int argc, char const * argv[])
 	uint32_t arg_visualmode = 1;
 	struct csc_argv_option option[] =
 	{
-	{'a', "address",         CSC_ARGV_TYPE_STRING, &arg_address,    {.val_umax = 0}, "The address to send to"},
-	{'f', "legacy_filename", CSC_ARGV_TYPE_STRING, &arg_filename,   {.val_umax = 0}, "The filename to load legacy pointcloud"},
-	{'h', "help",            CSC_ARGV_TYPE_U32,    &arg_flags,      {.val_u32 = ARG_HELP}, "Show help"},
-	{'v', "verbose",         CSC_ARGV_TYPE_U32,    &arg_flags,      {.val_u32 = ARG_VERBOSE}, "Show verbose"},
-	{'i', "input",           CSC_ARGV_TYPE_U32,    &arg_flags,      {.val_u32 = ARG_STDIN}, "Get pointcloud from stdin"},
-	{'L', "legacy_filename", CSC_ARGV_TYPE_U32,    &arg_flags,      {.val_u32 = ARG_LEGACY_FILENAME}, "ARG_LEGACY_FILENAME"},
-	{'m', "mode",            CSC_ARGV_TYPE_U32,    &arg_visualmode, {.val_umax = 0}, "The visual mode"},
-	{.type = CSC_ARGV_TYPE_END}};
-	csc_argv_parsev (option, argv+1);
+	{'a', "address",         CSC_TYPE_STRING, &arg_address,    0,                   "The address to send to"},
+	{'f', "legacy_filename", CSC_TYPE_STRING, &arg_filename,   0,                   "The filename to load legacy pointcloud"},
+	{'h', "help",            CSC_TYPE_U32,    &arg_flags,      ARG_HELP,            "Show help"},
+	{'v', "verbose",         CSC_TYPE_U32,    &arg_flags,      ARG_VERBOSE,         "Show verbose"},
+	{'i', "input",           CSC_TYPE_U32,    &arg_flags,      ARG_STDIN,           "Get pointcloud from stdin"},
+	{'L', "legacy_filename", CSC_TYPE_U32,    &arg_flags,      ARG_LEGACY_FILENAME, "ARG_LEGACY_FILENAME"},
+	{'m', "mode",            CSC_TYPE_U32,    &arg_visualmode, 0,                   "The visual mode"},
+	CSC_ARGV_END};
+	csc_argv_parseall (argv+1, option);
 	if (arg_flags & ARG_HELP)
 	{
-		csc_argv_print_description (option);
-		csc_argv_print_value (option);
+		csc_argv_description0 (option, stdout);
+		csc_argv_description1 (option, stdout);
 		return 0;
 	}
 
