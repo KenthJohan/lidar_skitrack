@@ -146,15 +146,15 @@ void show_init (nng_socket sock)
 	}
 
 	{
-		mg_send_add (sock, MYENT_DRAW_IMG2, MG_TRANSFORM);
 		component_position p = {0.0f, 0.0f, 0.0f, 1.0f};
 		component_position s = {1.0f, 1.0f, 0.0f, 1.0f};
 		component_position q = {0.0f, 0.0f, 0.0f, 1.0f};
 		uint32_t mesh = MYENT_MESH_RECTANGLE;
 		uint32_t texture = MYENT_TEXTURE1;
-		mg_send_set (sock, MYENT_DRAW_IMG2, MG_POSITION, p, sizeof (component_position));
-		mg_send_set (sock, MYENT_DRAW_IMG2, MG_SCALE, s, sizeof (component_position));
-		mg_send_set (sock, MYENT_DRAW_IMG2, MG_QUATERNION, q, sizeof (component_position));
+		mg_send_add (sock, MYENT_DRAW_IMG1, MG_TRANSFORM);
+		mg_send_set (sock, MYENT_DRAW_IMG1, MG_POSITION, p, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG1, MG_SCALE, s, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG1, MG_QUATERNION, q, sizeof (component_position));
 
 		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
 		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
