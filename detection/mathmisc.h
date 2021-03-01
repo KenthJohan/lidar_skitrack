@@ -225,7 +225,7 @@ float vf32_most_common_line2 (float const p[], uint32_t xn, uint32_t yn, float q
 			k1 = k;
 		}
 	}
-	printf ("max: %+f : %f\n", k1, max);
+	//printf ("max: %+f : %f\n", k1, max);
 	return k1;
 }
 

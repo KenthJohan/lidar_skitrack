@@ -111,10 +111,12 @@ enum visual_line
 
 
 
-#define VISUAL_MODE_IMG_MASK UINT32_C(0x0000000F)
-#define VISUAL_MODE_IMG1     UINT32_C(0x00000001)
-#define VISUAL_MODE_IMG2     UINT32_C(0x00000002)
-#define VISUAL_MODE_IMG3     UINT32_C(0x00000003)
+#define VISUAL_MODE_IMG_MASK          UINT32_C(0x0000000F)
+#define VISUAL_MODE_IMG1              UINT32_C(0x00000001)
+#define VISUAL_MODE_IMG2              UINT32_C(0x00000002)
+#define VISUAL_MODE_IMG3              UINT32_C(0x00000003)
+#define VISUAL_MODE_VERBOOSE_MASK     UINT32_C(0x000000F0)
+#define VISUAL_MODE_VERBOOSE1         UINT32_C(0x00000010)
 
 
 
@@ -182,13 +184,11 @@ void show_init (nng_socket sock)
 	16: Find all peaks                  : (1D image) -> ((position), (strength))
 	17: Output of skitrack position     : ((position), (strength))
 */
-void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t visual_mode)
+void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
 {
 	float pointpos[LIDAR_WH*POINT_STRIDE*2];
 	uint32_t pointcol[LIDAR_WH*2] = {0xFFFFFFFF};//The color of each point. This is only used for visualization.
 	uint32_t imgv[IMG_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
-
-
 
 	//points_test_sinus_slope (s1->pc);
 
@@ -197,8 +197,16 @@ void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32
 	skitrack2_process (s2, s1->pc, s1->pc_count);
 	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
+
+	if (flags & VISUAL_MODE_VERBOOSE1)
+	{
+		printf ("[INFO] Eigen values: %f %f %f\n", s1->w[0], s1->w[1], s1->w[2]);
+		printf ("[INFO] Eigen column vectors:\n");
+		m3f32_print (s1->c, stdout);
+	}
+
 	//Visualize the skitrack and more information:
-	switch (visual_mode & VISUAL_MODE_IMG_MASK)
+	switch (flags & VISUAL_MODE_IMG_MASK)
 	{
 	case VISUAL_MODE_IMG1:
 		image_visual (imgv, s2->img1, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
@@ -304,8 +312,12 @@ void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32
 			m[M4_11] = s1->c[7];//Column 1
 			m[M4_21] = s1->c[8];//Column 1
 			m[M4_33] = 1.0f;
-			m4f32_print(m, stdout);
-			mg_send_set (sock, MYENT_DRAW_IMG1, MG_TRANSFORM, m, sizeof (component_transform));
+			if (flags & VISUAL_MODE_VERBOOSE1)
+			{
+				printf ("[INFO] Affine matrix of img2:\n");
+				m4f32_print (m, stdout);
+			}
+			mg_send_set (sock, MYENT_DRAW_IMG2, MG_TRANSFORM, m, sizeof (component_transform));
 		}
 
 

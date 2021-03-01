@@ -25,7 +25,4 @@ static void skitrack1_process (struct skitrack1 * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
 	pointcloud_pca (s->pc, s->pc1, &s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
-	printf ("eigen vector:\n");
-	m3f32_print (s->c, stdout);
-	printf ("eigen value: %f %f %f\n", s->w[0], s->w[1], s->w[2]);
 }

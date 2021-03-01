@@ -48,6 +48,7 @@ int main (int argc, char const * argv[])
 	char const * arg_address = "tcp://localhost:9002";
 	uint32_t arg_flags = 0;
 	uint32_t arg_visualmode = 1;
+	uint32_t arg_showflags = 0;
 	struct csc_argv_option option[] =
 	{
 	{'a', "address",         CSC_TYPE_STRING, &arg_address,    0,                   "The address to send to"},
@@ -59,12 +60,20 @@ int main (int argc, char const * argv[])
 	{'m', "mode",            CSC_TYPE_U32,    &arg_visualmode, 0,                   "The visual mode"},
 	{'c', "ctrlmode",        CSC_TYPE_U32,    &arg_flags,      ARG_CTRLMODE,        "Step forward foreach keypress"},
 	CSC_ARGV_END};
+
 	csc_argv_parseall (argv+1, option);
+
 	if (arg_flags & ARG_HELP)
 	{
 		csc_argv_description0 (option, stdout);
 		csc_argv_description1 (option, stdout);
 		return 0;
+	}
+
+	arg_showflags |= arg_visualmode;
+	if (arg_flags & ARG_VERBOSE)
+	{
+		arg_showflags |= VISUAL_MODE_VERBOOSE1;
 	}
 
 	nng_socket sock;
@@ -76,23 +85,25 @@ int main (int argc, char const * argv[])
 	struct skitrack2 s2 = {0};
 	if (arg_flags & ARG_STDIN)
 	{
+		printf ("[INFO] Opening stdin to read LiDAR frames continuously.\n");
 		while (1)
 		{
 			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, stdin);
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
-			show (&s1, &s2, sock, arg_visualmode);
+			show (&s1, &s2, sock, arg_showflags);
 		}
 	}
 	else if ((arg_flags & ARG_LEGACY_FILENAME) && arg_filename)
 	{
+		printf ("[INFO] Opening legacy file %s to read LiDAR frames.\n", arg_filename);
 		legacy_points_read_filename (arg_filename, s1.pc, &s1.pc_count);
-		printf ("pc_count %i\n", s1.pc_count);
-		show (&s1, &s2, sock, arg_visualmode);
+		printf ("[INFO] pc_count %i\n", s1.pc_count);
+		show (&s1, &s2, sock, arg_showflags);
 	}
 	else if (arg_filename)
 	{
-		printf ("Opening binary file %s to read LiDAR frames.\n", arg_filename);
+		printf ("[INFO] Opening binary file %s to read LiDAR frames.\n", arg_filename);
 		FILE * f = fopen (arg_filename, "rb");
 		ASSERT_NOTNULL (f);
 		while (1)
@@ -100,7 +111,7 @@ int main (int argc, char const * argv[])
 			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, f);
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
-			show (&s1, &s2, sock, arg_visualmode);
+			show (&s1, &s2, sock, arg_showflags);
 			if (arg_flags & ARG_CTRLMODE)
 			{
 				getchar();
