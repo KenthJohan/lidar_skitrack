@@ -33,10 +33,11 @@
 #include "calculation.h"
 #include "mg_send.h"
 
-#define ARG_HELP    UINT32_C(0x00000001)
-#define ARG_VERBOSE UINT32_C(0x00000002)
-#define ARG_STDIN   UINT32_C(0x00000010)
+#define ARG_HELP             UINT32_C(0x00000001)
+#define ARG_VERBOSE          UINT32_C(0x00000002)
+#define ARG_STDIN            UINT32_C(0x00000010)
 #define ARG_LEGACY_FILENAME  UINT32_C(0x00000100)
+#define ARG_CTRLMODE         UINT32_C(0x00001000)
 
 
 //../txtpoints/4/14_17_18_225279.txt -m1
@@ -56,6 +57,7 @@ int main (int argc, char const * argv[])
 	{'i', "input",           CSC_TYPE_U32,    &arg_flags,      ARG_STDIN,           "Get pointcloud from stdin"},
 	{'L', "legacy_filename", CSC_TYPE_U32,    &arg_flags,      ARG_LEGACY_FILENAME, "ARG_LEGACY_FILENAME"},
 	{'m', "mode",            CSC_TYPE_U32,    &arg_visualmode, 0,                   "The visual mode"},
+	{'c', "ctrlmode",        CSC_TYPE_U32,    &arg_flags,      ARG_CTRLMODE,        "Step forward foreach keypress"},
 	CSC_ARGV_END};
 	csc_argv_parseall (argv+1, option);
 	if (arg_flags & ARG_HELP)
@@ -99,7 +101,10 @@ int main (int argc, char const * argv[])
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
 			show (&s1, &s2, sock, arg_visualmode);
-			usleep(10000);
+			if (arg_flags & ARG_CTRLMODE)
+			{
+				getchar();
+			}
 		}
 	}
 
