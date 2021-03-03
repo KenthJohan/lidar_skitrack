@@ -22,71 +22,7 @@
 
 
 
-uint32_t rgba_value (float value, float kr, float kg, float kb)
-{
-	uint32_t r = CLAMP (value*kr, 0.0f, 255.0f);
-	uint32_t g = CLAMP (value*kg, 0.0f, 255.0f);
-	uint32_t b = CLAMP (value*kb, 0.0f, 255.0f);
-	return RGBA (r, g, b, 0xFF);
-}
 
-
-
-/**
- * @brief Create RGBA image visualisation
- * @param[out] img  RGBA image visual
- * @param[in]  pix  Grayscale image
- * @param[in]  w    Width of the image
- * @param[in]  h    Height of the image
- */
-static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn, float q1[], float q2[], uint32_t g[], uint32_t m, float k)
-{
-	//Negatives becomes red and positives becomes greeen:
-	for (uint32_t i = 0; i < xn*yn; ++i)
-	{
-		img[i] = rgba_value (pix[i], -3000.0f, 3000.0f, 0.0f);
-	}
-
-
-	for (uint32_t y = 0; y < yn; ++y)
-	{
-		img[y*xn+1] = rgba_value (q1[y], -100.0f, 100.0f, 0.0f);
-		img[y*xn+0] = rgba_value (q2[y], -100.0f, 100.0f, 0.0f);
-	}
-
-
-	for (uint32_t y = 0; y < yn; ++y)
-	{
-		if (q1[y] == 0)
-		{
-			img[y*xn+1] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-		if (q2[y] == 0)
-		{
-			img[y*xn+0] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-	}
-
-
-	for (uint32_t i = 0; i < m; ++i)
-	{
-		if (g[i] < yn)
-		{
-			uint32_t y = g[i];
-			for (uint32_t x = 0; x < xn; ++x)
-			{
-				float yy = (float)y + (float)x*k;
-				if (yy < 0.0f){continue;}
-				if (yy >= (float)yn){continue;}
-				ASSERT (yy >= 0);
-				ASSERT (yy < (float)yn);
-				uint32_t index = (uint32_t)yy * xn + x;
-				ASSERT (index < xn*yn);
-				img[index] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
-			}
-		}
-	}
-}
 
 
 
@@ -162,6 +98,13 @@ void show_init (nng_socket sock)
 		mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
 	}
 
+	{
+		//The color of each point. This is only used for visualization.
+		uint32_t pointcol[LIDAR_WH*2];
+		vu32_set1 (LIDAR_WH*2, pointcol, 0xFFFFFFFF);
+		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_COL, pointcol, LIDAR_WH*sizeof(uint32_t)*2);
+	}
+
 }
 
 
@@ -187,7 +130,6 @@ void show_init (nng_socket sock)
 void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
 {
 	float pointpos[LIDAR_WH*POINT_STRIDE*2];
-	uint32_t pointcol[LIDAR_WH*2] = {0xFFFFFFFF};//The color of each point. This is only used for visualization.
 	uint32_t imgv[IMG_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
 
 	//points_test_sinus_slope (s1->pc);

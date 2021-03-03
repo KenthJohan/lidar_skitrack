@@ -270,6 +270,8 @@ void pixel_to_point (float p[4], uint32_t xn, uint32_t yn, float pixel, float x,
 
 void point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], uint32_t v_stride, uint32_t x_count)
 {
+	memset (pix, 0, sizeof(float) * xn * yn);
+	memset (imgf, 0, sizeof(float) * xn * yn);
 	for (uint32_t i = 0; i < x_count; ++i, v += v_stride)
 	{
 		//v[2] += 1.0f;
@@ -445,5 +447,75 @@ unsigned points_count
 		img2d[PIXEL_INDEX(ux, uy)] = img2d[PIXEL_INDEX(ux, uy)]/2 + uz*4;
 		//printf ("%x\n", img2d[PIXEL_INDEX(ux, uy)]);
 		main_vox_neighbor (&id, voxel, ux, uy, uz);
+	}
+}
+
+
+
+
+
+uint32_t rgba_value (float value, float kr, float kg, float kb)
+{
+	uint32_t r = CLAMP (value*kr, 0.0f, 255.0f);
+	uint32_t g = CLAMP (value*kg, 0.0f, 255.0f);
+	uint32_t b = CLAMP (value*kb, 0.0f, 255.0f);
+	return RGBA (r, g, b, 0xAA);
+}
+
+
+
+/**
+ * @brief Create RGBA image visualisation
+ * @param[out] img  RGBA image visual
+ * @param[in]  pix  Grayscale image
+ * @param[in]  w    Width of the image
+ * @param[in]  h    Height of the image
+ */
+static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn, float q1[], float q2[], uint32_t g[], uint32_t m, float k)
+{
+	//Negatives becomes red and positives becomes greeen:
+	for (uint32_t i = 0; i < xn*yn; ++i)
+	{
+		img[i] = rgba_value (pix[i], -3000.0f, 3000.0f, 0.0f);
+	}
+
+
+	for (uint32_t y = 0; y < yn; ++y)
+	{
+		img[y*xn+1] = rgba_value (q1[y], -100.0f, 100.0f, 0.0f);
+		img[y*xn+0] = rgba_value (q2[y], -100.0f, 100.0f, 0.0f);
+	}
+
+
+	for (uint32_t y = 0; y < yn; ++y)
+	{
+		if (q1[y] == 0)
+		{
+			img[y*xn+1] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
+		}
+		if (q2[y] == 0)
+		{
+			img[y*xn+0] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
+		}
+	}
+
+
+	for (uint32_t i = 0; i < m; ++i)
+	{
+		if (g[i] < yn)
+		{
+			uint32_t y = g[i];
+			for (uint32_t x = 0; x < xn; ++x)
+			{
+				float yy = (float)y + (float)x*k;
+				if (yy < 0.0f){continue;}
+				if (yy >= (float)yn){continue;}
+				ASSERT (yy >= 0);
+				ASSERT (yy < (float)yn);
+				uint32_t index = (uint32_t)yy * xn + x;
+				ASSERT (index < xn*yn);
+				img[index] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
+			}
+		}
 	}
 }

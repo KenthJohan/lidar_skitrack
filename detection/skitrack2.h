@@ -7,7 +7,7 @@
 #include "../shared/shared.h"
 #include "mathmisc.h"
 
-#define SKITRACK2_PEAKS_COUNT 2
+#define SKITRACK2_PEAKS_COUNT 1
 
 
 struct skitrack2
