@@ -81,6 +81,18 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
 	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', 3, c, 3, w);
+	//Prevent pointcloud flipping:
+	if (c[7] < 0.0f)
+	{
+		//Flip Y vector of pointcloud
+		c[3] *= -1.0f;
+		c[4] *= -1.0f;
+		c[5] *= -1.0f;
+		//Flip Z vector of pointcloud
+		c[6] *= -1.0f;
+		c[7] *= -1.0f;
+		c[8] *= -1.0f;
+	}
 	//Rectify every point by this rotation matrix which is the current orientation of the points:
 	r[0] = c[3];
 	r[1] = c[6];
@@ -464,58 +476,4 @@ uint32_t rgba_value (float value, float kr, float kg, float kb)
 
 
 
-/**
- * @brief Create RGBA image visualisation
- * @param[out] img  RGBA image visual
- * @param[in]  pix  Grayscale image
- * @param[in]  w    Width of the image
- * @param[in]  h    Height of the image
- */
-static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn, float q1[], float q2[], uint32_t g[], uint32_t m, float k)
-{
-	//Negatives becomes red and positives becomes greeen:
-	for (uint32_t i = 0; i < xn*yn; ++i)
-	{
-		img[i] = rgba_value (pix[i], -3000.0f, 3000.0f, 0.0f);
-	}
 
-
-	for (uint32_t y = 0; y < yn; ++y)
-	{
-		img[y*xn+1] = rgba_value (q1[y], -100.0f, 100.0f, 0.0f);
-		img[y*xn+0] = rgba_value (q2[y], -100.0f, 100.0f, 0.0f);
-	}
-
-
-	for (uint32_t y = 0; y < yn; ++y)
-	{
-		if (q1[y] == 0)
-		{
-			img[y*xn+1] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-		if (q2[y] == 0)
-		{
-			img[y*xn+0] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-	}
-
-
-	for (uint32_t i = 0; i < m; ++i)
-	{
-		if (g[i] < yn)
-		{
-			uint32_t y = g[i];
-			for (uint32_t x = 0; x < xn; ++x)
-			{
-				float yy = (float)y + (float)x*k;
-				if (yy < 0.0f){continue;}
-				if (yy >= (float)yn){continue;}
-				ASSERT (yy >= 0);
-				ASSERT (yy < (float)yn);
-				uint32_t index = (uint32_t)yy * xn + x;
-				ASSERT (index < xn*yn);
-				img[index] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
-			}
-		}
-	}
-}
