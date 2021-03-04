@@ -49,6 +49,7 @@ int main (int argc, char const * argv[])
 	uint32_t arg_flags = 0;
 	uint32_t arg_visualmode = 1;
 	uint32_t arg_showflags = 0;
+	uint32_t arg_usleep = 0;
 	struct csc_argv_option option[] =
 	{
 	{'a', "address",         CSC_TYPE_STRING, &arg_address,    0,                   "The address to send to"},
@@ -59,6 +60,7 @@ int main (int argc, char const * argv[])
 	{'L', "legacy_filename", CSC_TYPE_U32,    &arg_flags,      ARG_LEGACY_FILENAME, "ARG_LEGACY_FILENAME"},
 	{'m', "mode",            CSC_TYPE_U32,    &arg_visualmode, 0,                   "The visual mode"},
 	{'c', "ctrlmode",        CSC_TYPE_U32,    &arg_flags,      ARG_CTRLMODE,        "Step forward foreach keypress"},
+	{'d', "duration",        CSC_TYPE_U32,    &arg_usleep,     0,                   "Duration for each frame"},
 	CSC_ARGV_END};
 
 	csc_argv_parseall (argv+1, option);
@@ -115,6 +117,10 @@ int main (int argc, char const * argv[])
 			if (arg_flags & ARG_CTRLMODE)
 			{
 				getchar();
+			}
+			if (arg_usleep)
+			{
+				usleep (arg_usleep);
 			}
 		}
 	}

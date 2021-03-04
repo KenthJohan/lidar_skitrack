@@ -10,6 +10,26 @@
 #define SKITRACK2_PEAKS_COUNT 1
 
 
+
+/*
+	 1: Read filename                   : (Filename) -> (text 3D points)
+	 2: Convert text points to f32      : (text 3D points) -> (3D points)
+	 3: Filter out bad points           : (3D points) -> (3D points)
+	 4: (PCA) Move center to origin     : (3D points) -> (3D points)
+	 5: (PCA) Get covariance matrix     : (3D points) -> (3x3 matrix)
+	 6: (PCA) Get eigen vectors         : (3x3 matrix) -> (3x3 rotation matrix)
+	 7: (PCA) Rectify points            : ((3x3 rotation matrix), (3D points)) -> (3D points)
+	 8: Project 3D points to 2D image   : (3D points)) -> (2D image)
+	 9: (Conv) Amplify skitrack         : (2D image) -> (2D image)
+	10: Remove low values               : (2D image) -> (2D image)
+	11: (Conv) Smooth                   : (2D image) -> (2D image)
+	12: Find most common line direction : (2D image) -> (direction)
+	13: Project 2D image to 1D image    : ((2D image), (direction)) -> (1D image)
+	14: Remove low values               : (1D image) -> (1D image)
+	15: (Conv) Amplify 1D skitracks     : (1D image) -> (1D image)
+	16: Find all peaks                  : (1D image) -> ((position), (strength))
+	17: Output of skitrack position     : ((position), (strength))
+*/
 struct skitrack2
 {
 	float img1[IMG_XN*IMG_YN];//Projected points
@@ -21,10 +41,6 @@ struct skitrack2
 	uint32_t g[SKITRACK2_PEAKS_COUNT];
 	float k;
 };
-
-
-
-
 
 
 static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_count)

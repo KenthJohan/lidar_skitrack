@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "csc/csc_debug.h"
 #include "csc/csc_m3f32.h"
+#include "csc/csc_v3f32.h"
 
 #include "../shared/shared.h"
 #include "mathmisc.h"
@@ -25,4 +26,6 @@ static void skitrack1_process (struct skitrack1 * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
 	pointcloud_pca (s->pc, s->pc1, &s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+
+
 }
