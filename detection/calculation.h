@@ -68,7 +68,7 @@ static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
 	{
 		if (s->g1[i] < IMG_YN)
 		{
-			uint32_t y = s->g1[i];
+			uint32_t y = s->g3[i];
 			for (uint32_t x = 0; x < IMG_XN; ++x)
 			{
 				float yy = (float)y + (float)x * s->k;
@@ -310,6 +310,7 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 	}
 
 	*/
+
 
 	{
 		struct v4f32_line pos[6];

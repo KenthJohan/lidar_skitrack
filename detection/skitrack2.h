@@ -42,6 +42,8 @@ struct skitrack2
 	float q4[IMG_YN];
 	uint32_t g[SKITRACK2_PEAKS_COUNT];
 	float g1[SKITRACK2_PEAKS_COUNT];
+	float g2[SKITRACK2_PEAKS_COUNT];
+	float g3[SKITRACK2_PEAKS_COUNT];
 	float k;
 };
 
@@ -59,14 +61,15 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	//Amplify skitrack pattern in the 2D image:
 	{
 		int32_t kxn = 1;
-		int32_t kyn = 5;
-		float kernel[1*5] =
+		int32_t kyn = 6;
+		float kernel[1*6] =
 		{
-		-5.0f,
+		-8.0f,
 		2.0f,
 		6.0f,
+		6.0f,
 		2.0f,
-		-5.0f
+		-8.0f
 		};
 		vf32_normalize (kxn*kyn, kernel, kernel);
 		vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
@@ -105,7 +108,8 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	vf32_remove_low_values (s->q1, IMG_YN);
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
-		s->q2[i] = s->q1[i] * s->q1[i] * 1.0f;
+		//s->q2[i] = s->q1[i] * s->q1[i] * 1.0f;
+		s->q2[i] = fabs(s->q1[i]);
 	}
 	float skitrack_kernel1d_a[] =
 	{
@@ -128,19 +132,37 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 
 	//vf32_weight_ab (IMG_YN, s->q3, s->q3, s->q2, 0.5f);
 
+	for (uint32_t i = 0; i < IMG_YN; ++i)
+	{
+		if(s->q1[i] < 0.0f)
+		{
+			s->q3[i] = 0.0f;
+		}
+	}
 	//Find the peaks which should be where the skitrack is positioned:
 	{
 		float q[IMG_YN] = {0.0f};
 		memcpy (q, s->q3, sizeof (q));
 		vf32_find_peaks (q, IMG_YN, s->g, SKITRACK2_PEAKS_COUNT, 16, 20);
 	}
+	//Need float
+	s->g1[0] = s->g[0];
+
+
+
+	if(fabs(s->g2[0] - s->g1[0]) < 10.0f)
+	{
+		s->g3[0] = s->g1[0];
+	}
+	s->g2[0] = s->g1[0];
+
 
 
 	//Exponential Moving Average (EMA) filter:
-	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
+	//for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		float k = 0.0f;
-		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
+		//float k = 0.7f;
+		//s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
 	}
 
 
