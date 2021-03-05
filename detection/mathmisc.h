@@ -140,6 +140,14 @@ void vf32_project_2d_to_1d (float p[], uint32_t xn, uint32_t yn, float k, float 
 }
 
 
+
+/**
+ * @brief Find peaks.
+ * @param q[in,out] The array
+ * @param qn[in]    Number of elements in \p q
+ * @param g[out]    The index where the peak is located
+ * @param gn[in]    Number of elements in \p g
+ */
 void vf32_project_2d_to_1d_pn (float const p[], uint32_t xn, uint32_t yn, float k, float q[])
 {
 	for (uint32_t y = 0; y < yn; ++y)

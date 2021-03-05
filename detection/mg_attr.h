@@ -8,6 +8,10 @@ enum mg_attr
 	MG_POINTCLOUD_POS,
 	MG_POINTCLOUD_COL,
 
+	MG_LINES,
+	MG_LINES_POS,
+	MG_LINES_COL,
+
 	MG_MESH,
 	MG_ADD_INSTANCEOF,
 
@@ -20,11 +24,6 @@ enum mg_attr
 	MG_RECTANGLE,
 	MG_TRANSFORM,
 };
-
-
-
-
-
 
 
 

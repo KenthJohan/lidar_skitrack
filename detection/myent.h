@@ -13,5 +13,8 @@ enum myent
 
 	MYENT_DRAW_IMG3,
 	MYENT_DRAW_IMG4,
+
+
+	MYENT_DRAW_LINES,
 };
 

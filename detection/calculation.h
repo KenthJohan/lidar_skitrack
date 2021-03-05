@@ -61,6 +61,7 @@ static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn,
 
 }
 
+
 static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
 {
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
@@ -82,6 +83,7 @@ static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
 		}
 	}
 }
+
 
 static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 {
@@ -105,6 +107,7 @@ static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 	}
 	mg_send_set (sock, MYENT_DRAW_IMG2, MG_TRANSFORM, m, sizeof (component_transform));
 }
+
 
 static void show_img4 (nng_socket sock, struct skitrack2 * s2)
 {
@@ -132,12 +135,15 @@ static void show_img4 (nng_socket sock, struct skitrack2 * s2)
 	mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE_CONTENT, imgv, IMG3_XN*IMG_YN*sizeof(uint32_t));
 }
 
+
 static void show_init (nng_socket sock)
 {
 
 	mg_send_add (sock, MYENT_MESH_RECTANGLE, MG_MESH);
 	mg_send_add (sock, MYENT_MESH_RECTANGLE2, MG_MESH);
 	mg_send_add (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD);
+	mg_send_add (sock, MYENT_DRAW_LINES, MG_LINES);
+
 
 	{
 		component_texture t1 = {0, IMG_XN, IMG_YN, 1};
@@ -178,8 +184,8 @@ static void show_init (nng_socket sock)
 
 		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
 		mg_send_set (sock, MYENT_DRAW_IMG1, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
-		mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
-		mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
+		//mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
+		//mg_send_set (sock, MYENT_DRAW_IMG2, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
 	}
 
 	{
@@ -202,6 +208,18 @@ static void show_init (nng_socket sock)
 		uint32_t pointcol[LIDAR_WH*2];
 		vu32_set1 (LIDAR_WH*2, pointcol, 0xFFFFFFFF);
 		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_COL, pointcol, LIDAR_WH*sizeof(uint32_t)*2);
+	}
+
+	{
+		//The color of each point. This is only used for visualization.
+		v4f32 lines[6];
+		uint32_t col[6];
+		component_count c = 6;
+		vu32_set1 (6, col, 0xFFFFFFFF);
+
+		mg_send_set (sock, MYENT_DRAW_LINES, MG_COUNT, &c, sizeof(c));
+		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_COL, col, sizeof(col));
+		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_POS, lines, sizeof(lines));
 	}
 
 }
@@ -256,46 +274,26 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 	//pix_rgba[2*IMG_XN + 0] |= RGBA(0x00, 0xFF, 0xff, 0xFF);
 	//pix_rgba[2*IMG_XN + 1] |= RGBA(0x00, 0xFF, 0xff, 0xFF);
 
-	struct v4f32_line linepos1[VISUAL_LINE_COUNT];
-	struct u32_line linecol1[VISUAL_LINE_COUNT];
 
+
+	/*
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].a, 0.0f, 0.0f, 0.0f);
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].b, 1.0f, 0.0f, 0.0f);
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].a, 0.0f, 0.0f, 0.0f);
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].b, 0.0f, 1.0f, 0.0f);
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].a, 0.0f, 0.0f, 0.0f);
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].b, 0.0f, 0.0f, 1.0f);
-
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_0].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_0].b, s1->c[0], s1->c[1], s1->c[2]);
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_1].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_1].b, s1->c[3], s1->c[4], s1->c[5]);
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_2].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (linepos1[VISUAL_LINE_PCA_2].b, s1->c[6], s1->c[7], s1->c[8]);
-
-
-
-
 	linecol1[VISUAL_LINE_ORIGIN_0].a = RGBA(0xFF, 0x00, 0x00, 0xFF);
 	linecol1[VISUAL_LINE_ORIGIN_0].b = RGBA(0xFF, 0x00, 0x00, 0xFF);
 	linecol1[VISUAL_LINE_ORIGIN_1].a = RGBA(0x00, 0xFF, 0x00, 0xFF);
 	linecol1[VISUAL_LINE_ORIGIN_1].b = RGBA(0x00, 0xFF, 0x00, 0xFF);
 	linecol1[VISUAL_LINE_ORIGIN_2].a = RGBA(0x00, 0x00, 0xFF, 0xFF);
 	linecol1[VISUAL_LINE_ORIGIN_2].b = RGBA(0x00, 0x00, 0xFF, 0xFF);
-
-	linecol1[VISUAL_LINE_PCA_0].a = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-	linecol1[VISUAL_LINE_PCA_0].b = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-	linecol1[VISUAL_LINE_PCA_1].a = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-	linecol1[VISUAL_LINE_PCA_1].b = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-	linecol1[VISUAL_LINE_PCA_2].a = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-	linecol1[VISUAL_LINE_PCA_2].b = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-
 	for (int i = VISUAL_LINE_SKITRACK; i <= VISUAL_LINE_SKITRACK_END; ++i)
 	{
 		linecol1[i].a = RGBA(0x77, 0xFF, 0x11, 0xFF);
 		linecol1[i].b = RGBA(0x77, 0xFF, 0x11, 0xFF);
 	}
-
 	{
 		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[0] - 10.0f * s2->k);
 		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[0] + 30.0f * s2->k);
@@ -310,6 +308,33 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 			vvf32_add (4, i, i, s1->centroid);
 		}
 	}
+
+	*/
+
+	{
+		struct v4f32_line pos[6];
+		struct u32_line col[6];
+		vf32_set3 (pos[0].a, 0.0f   , 0.0f   , 0.0f   );
+		vf32_set3 (pos[0].b, s1->c[0], s1->c[1], s1->c[2]);
+		vf32_set3 (pos[1].a, 0.0f   , 0.0f   , 0.0f   );
+		vf32_set3 (pos[1].b, s1->c[3], s1->c[4], s1->c[5]);
+		vf32_set3 (pos[2].a, 0.0f   , 0.0f   , 0.0f   );
+		vf32_set3 (pos[2].b, s1->c[6], s1->c[7], s1->c[8]);
+		vsf32_mul (4, pos[0].b, pos[0].b, sqrt(s1->w[0])*2.0f);
+		vsf32_mul (4, pos[1].b, pos[1].b, sqrt(s1->w[1])*2.0f);
+		vsf32_mul (4, pos[2].b, pos[2].b, sqrt(s1->w[2])*2.0f);
+		vf32_addv (4, pos, 4, pos, 4, s1->centroid, 0, 12);
+		col[0].a = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		col[0].b = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		col[1].a = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		col[1].b = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		col[2].a = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		col[2].b = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_POS, pos, sizeof(pos));
+		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_COL, col, sizeof(col));
+	}
+
+
 
 	show_img2 (sock, s1, flags);
 	show_img4 (sock, s2);

@@ -96,10 +96,8 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	//memcpy (img3, img2, sizeof(img3));
 
 
-
 	//Find the most common lines direction in the image which hopefully matches the direction of the skitrack:
 	//Project 2D image to a 1D image in the the most common direction (k):
-
 	//float k = vf32_most_common_line (img3, IMG_XN, IMG_YN, 20);
 	s->k = vf32_most_common_line2 (s->img3, IMG_XN, IMG_YN, s->q1);
 	//vf32_project_2d_to_1d (img3, IMG_XN, IMG_YN, k, q1);
@@ -107,13 +105,13 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	vf32_remove_low_values (s->q1, IMG_YN);
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
-		s->q1[i] = s->q1[i] * s->q1[i] * 1.0f;
+		s->q2[i] = s->q1[i] * s->q1[i] * 1.0f;
 	}
 	float skitrack_kernel1d_a[] =
 	{
 	 1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f
 	};
-	vf32_convolution1d (s->q1, IMG_YN, s->q2, skitrack_kernel1d_a, countof (skitrack_kernel1d_a));
+	vf32_convolution1d (s->q2, IMG_YN, s->q3, skitrack_kernel1d_a, countof (skitrack_kernel1d_a));
 
 	/*
 	//Amplify skitrack pattern in the 1D image:
@@ -128,26 +126,20 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	vf32_convolution1d (s->q1, IMG_YN, s->q2, skitrack_kernel1d, countof (skitrack_kernel1d));
 	*/
 
-
-
-
-
-
 	//vf32_weight_ab (IMG_YN, s->q3, s->q3, s->q2, 0.5f);
-
 
 	//Find the peaks which should be where the skitrack is positioned:
 	{
 		float q[IMG_YN] = {0.0f};
-		memcpy (q, s->q2, sizeof (q));
+		memcpy (q, s->q3, sizeof (q));
 		vf32_find_peaks (q, IMG_YN, s->g, SKITRACK2_PEAKS_COUNT, 16, 20);
 	}
 
 
-
+	//Exponential Moving Average (EMA) filter:
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		float k = 0.7f;
+		float k = 0.0f;
 		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
 	}
 
