@@ -94,9 +94,9 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 		c[8] *= -1.0f;
 	}
 	//Rectify every point by this rotation matrix which is the current orientation of the points:
-	r[0] = c[3];
-	r[1] = c[6];
-	r[2] = c[0];
+	r[0] = c[3];// x <=> y
+	r[1] = c[6];// y <=> z
+	r[2] = c[0];// z <=> x
 	r[3] = c[4];
 	r[4] = c[7];
 	r[5] = c[1];
@@ -256,8 +256,8 @@ void point_select (uint32_t pointcol[LIDAR_WH], int x, int y, uint32_t color)
 
 void point_to_pixel (float const p[4], uint32_t xn, uint32_t yn, float * pixel, float * x, float * y)
 {
-	float const sx = 20.0f;
-	float const sy = 20.0f;
+	float const sx = 1.0f/IMG_SCALE;
+	float const sy = 1.0f/IMG_SCALE;
 	(*x) = p[0]*sx + xn/2.0f;
 	(*y) = p[1]*sy + yn/2.0f;
 	//z-value becomes the pixel value:

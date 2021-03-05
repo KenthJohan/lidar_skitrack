@@ -20,17 +20,6 @@
 #include "skitrack2.h"
 
 
-
-
-
-
-
-
-
-
-
-
-
 enum visual_line
 {
 	VISUAL_LINE_ORIGIN_0,
@@ -45,14 +34,14 @@ enum visual_line
 };
 
 
-
-
 #define VISUAL_MODE_IMG_MASK          UINT32_C(0x0000000F)
 #define VISUAL_MODE_IMG1              UINT32_C(0x00000001)
 #define VISUAL_MODE_IMG2              UINT32_C(0x00000002)
 #define VISUAL_MODE_IMG3              UINT32_C(0x00000003)
 #define VISUAL_MODE_VERBOOSE_MASK     UINT32_C(0x000000F0)
 #define VISUAL_MODE_VERBOOSE1         UINT32_C(0x00000010)
+
+#define IMG3_XN 4
 
 
 /**
@@ -70,47 +59,29 @@ static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn,
 		img[i] = rgba_value (pix[i], -3000.0f, 3000.0f, 0.0f);
 	}
 
+}
 
-	for (uint32_t y = 0; y < yn; ++y)
+static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
+{
+	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		img[y*xn+1] = rgba_value (q1[y], -100.0f, 100.0f, 0.0f);
-		img[y*xn+0] = rgba_value (q2[y], -100.0f, 100.0f, 0.0f);
-	}
-
-
-	for (uint32_t y = 0; y < yn; ++y)
-	{
-		if (q1[y] == 0)
+		if (s->g1[i] < IMG_YN)
 		{
-			img[y*xn+1] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-		if (q2[y] == 0)
-		{
-			img[y*xn+0] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
-		}
-	}
-
-
-	for (uint32_t i = 0; i < m; ++i)
-	{
-		if (g[i] < yn)
-		{
-			uint32_t y = g[i];
-			for (uint32_t x = 0; x < xn; ++x)
+			uint32_t y = s->g1[i];
+			for (uint32_t x = 0; x < IMG_XN; ++x)
 			{
-				float yy = (float)y + (float)x*k;
+				float yy = (float)y + (float)x * s->k;
 				if (yy < 0.0f){continue;}
-				if (yy >= (float)yn){continue;}
+				if (yy >= (float)IMG_YN){continue;}
 				ASSERT (yy >= 0);
-				ASSERT (yy < (float)yn);
-				uint32_t index = (uint32_t)yy * xn + x;
-				ASSERT (index < xn*yn);
+				ASSERT (yy < (float)IMG_YN);
+				uint32_t index = (uint32_t)yy * IMG_XN + x;
+				ASSERT (index < IMG_XN*IMG_YN);
 				img[index] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
 			}
 		}
 	}
 }
-
 
 static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 {
@@ -135,16 +106,42 @@ static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 	mg_send_set (sock, MYENT_DRAW_IMG2, MG_TRANSFORM, m, sizeof (component_transform));
 }
 
+static void show_img4 (nng_socket sock, struct skitrack2 * s2)
+{
+	uint32_t imgv[IMG3_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
+
+	for (uint32_t y = 0; y < IMG_YN; ++y)
+	{
+		imgv[y+IMG_YN*0] = rgba_value (s2->q1[y], -100.0f, 100.0f, 0.0f);
+		imgv[y+IMG_YN*1] = rgba_value (s2->q2[y], -100.0f, 100.0f, 0.0f);
+		imgv[y+IMG_YN*2] = rgba_value (s2->q3[y], -100.0f, 100.0f, 0.0f);
+		imgv[y+IMG_YN*3] = rgba_value (s2->q4[y], -100.0f, 100.0f, 0.0f);
+		/*
+		if (s2->q1[y] == 0)
+		{
+			imgv[y+IMG_YN*0] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
+		}
+		if (s2->q2[y] == 0)
+		{
+			imgv[y+IMG_YN*1] = RGBA (0xAA, 0xAA, 0x00, 0xFF);
+		}
+		*/
+	}
+
+
+	mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE_CONTENT, imgv, IMG3_XN*IMG_YN*sizeof(uint32_t));
+}
 
 static void show_init (nng_socket sock)
 {
 
 	mg_send_add (sock, MYENT_MESH_RECTANGLE, MG_MESH);
+	mg_send_add (sock, MYENT_MESH_RECTANGLE2, MG_MESH);
 	mg_send_add (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD);
 
 	{
 		component_texture t1 = {0, IMG_XN, IMG_YN, 1};
-		component_texture t2 = {0, IMG_XN, IMG_YN, 1};
+		component_texture t2 = {0, IMG_YN, IMG3_XN, 1};
 		mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE, &t1, sizeof(component_texture));
 		mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE, &t2, sizeof(component_texture));
 	}
@@ -154,6 +151,13 @@ static void show_init (nng_socket sock)
 		component_rectangle r = {IMG_XN*IMG_SCALE, IMG_YN*IMG_SCALE};
 		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_COUNT, &c, sizeof(component_count));
 		mg_send_set (sock, MYENT_MESH_RECTANGLE, MG_RECTANGLE, &r, sizeof(component_rectangle));
+	}
+
+	{
+		component_count c = 6;
+		component_rectangle r = {IMG_YN*IMG_SCALE, IMG3_XN*IMG_SCALE};
+		mg_send_set (sock, MYENT_MESH_RECTANGLE2, MG_COUNT, &c, sizeof(component_count));
+		mg_send_set (sock, MYENT_MESH_RECTANGLE2, MG_RECTANGLE, &r, sizeof(component_rectangle));
 	}
 
 	{
@@ -179,6 +183,21 @@ static void show_init (nng_socket sock)
 	}
 
 	{
+		uint32_t mesh = MYENT_MESH_RECTANGLE2;
+		uint32_t texture = MYENT_TEXTURE2;
+		component_position p = {-0.8f, 0.0f, 0.0f, 1.0f};
+		component_position s = {1.0f, 1.0f, 0.0f, 1.0f};
+		component_position q = {0.0f, 0.0f, 0.0f, 1.0f};
+		qf32_xyza (q, 0.0f, 0.0f, 1.0f, M_PI/2.0f);
+		mg_send_add (sock, MYENT_DRAW_IMG4, MG_TRANSFORM);
+		mg_send_set (sock, MYENT_DRAW_IMG4, MG_POSITION, p, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG4, MG_SCALE, s, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG4, MG_QUATERNION, q, sizeof (component_position));
+		mg_send_set (sock, MYENT_DRAW_IMG4, MG_ADD_INSTANCEOF, &mesh, sizeof (uint32_t));
+		mg_send_set (sock, MYENT_DRAW_IMG4, MG_ADD_INSTANCEOF, &texture, sizeof (uint32_t));
+	}
+
+	{
 		//The color of each point. This is only used for visualization.
 		uint32_t pointcol[LIDAR_WH*2];
 		vu32_set1 (LIDAR_WH*2, pointcol, 0xFFFFFFFF);
@@ -189,7 +208,12 @@ static void show_init (nng_socket sock)
 
 
 
-void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
+
+
+
+
+
+static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
 {
 	float pointpos[LIDAR_WH*POINT_STRIDE*2];
 	uint32_t imgv[IMG_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
@@ -222,6 +246,8 @@ void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32
 		image_visual (imgv, s2->img3, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
 		break;
 	}
+
+	draw_skitrack (s2, imgv);
 
 
 
@@ -286,6 +312,7 @@ void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32
 	}
 
 	show_img2 (sock, s1, flags);
+	show_img4 (sock, s2);
 
 	//Send visual information to the graphic server:
 	{

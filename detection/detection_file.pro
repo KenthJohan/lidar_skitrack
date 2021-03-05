@@ -15,6 +15,7 @@ HEADERS += myent.h
 HEADERS += mathmisc.h
 HEADERS += skitrack1.h
 HEADERS += skitrack2.h
+HEADERS += skitrack3.h
 HEADERS += mg_comp.h
 HEADERS += mg_attr.h
 HEADERS += csc/csc_math.h

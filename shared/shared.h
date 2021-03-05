@@ -33,7 +33,7 @@
 #define VOXEL_SCALE 0.15f
 #define PIXEL_INDEX(x,y) ((y)*VOXEL_XN + (x))
 
-#define IMG_XN 20
-#define IMG_YN 120
+#define IMG_XN 30
+#define IMG_YN 140
 #define IMG_CN 4
-#define IMG_SCALE (1.0f/20.0f)
+#define IMG_SCALE (1.0f/30.0f)
