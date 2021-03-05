@@ -44,34 +44,40 @@ enum visual_line
 #define IMG3_XN 4
 
 
-/**
- * @brief Create RGBA image visualisation
- * @param[out] img  RGBA image visual
- * @param[in]  pix  Grayscale image
- * @param[in]  w    Width of the image
- * @param[in]  h    Height of the image
- */
-static void image_visual (uint32_t img[], float pix[], uint32_t xn, uint32_t yn, float q1[], float q2[], uint32_t g[], uint32_t m, float k)
+
+static void convert_float_to_rgba (uint32_t img[], float pix[], uint32_t n)
 {
 	//Negatives becomes red and positives becomes greeen:
-	for (uint32_t i = 0; i < xn*yn; ++i)
+	for (uint32_t i = 0; i < n; ++i)
 	{
 		img[i] = rgba_value (pix[i], -3000.0f, 3000.0f, 0.0f);
 	}
-
 }
 
 
-static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
+static void draw_skitrack (nng_socket sock, struct skitrack2 * s2, uint32_t img[], uint32_t flags)
 {
+	//Visualize the skitrack and more information:
+	switch (flags & VISUAL_MODE_IMG_MASK)
+	{
+	case VISUAL_MODE_IMG1:
+		convert_float_to_rgba (img, s2->img1, IMG_XN*IMG_YN);
+		break;
+	case VISUAL_MODE_IMG2:
+		convert_float_to_rgba (img, s2->img2, IMG_XN*IMG_YN);
+		break;
+	case VISUAL_MODE_IMG3:
+		convert_float_to_rgba (img, s2->img3, IMG_XN*IMG_YN);
+		break;
+	}
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		if (s->g1[i] < IMG_YN)
+		if (s2->g1[i] < IMG_YN)
 		{
-			uint32_t y = s->g3[i];
+			uint32_t y = s2->g3[i];
 			for (uint32_t x = 0; x < IMG_XN; ++x)
 			{
-				float yy = (float)y + (float)x * s->k;
+				float yy = (float)y + (float)x * s2->k;
 				if (yy < 0.0f){continue;}
 				if (yy >= (float)IMG_YN){continue;}
 				ASSERT (yy >= 0);
@@ -82,10 +88,11 @@ static void draw_skitrack(struct skitrack2 * s, uint32_t img[])
 			}
 		}
 	}
+	mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE_CONTENT, img, IMG_XN*IMG_YN*sizeof(uint32_t));
 }
 
 
-static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
+static void draw_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 {
 	float m[4*4] = {0.0f};
 	//m4f32_identity (m);
@@ -109,7 +116,7 @@ static void show_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 }
 
 
-static void show_img4 (nng_socket sock, struct skitrack2 * s2)
+static void draw_img4 (nng_socket sock, struct skitrack2 * s2)
 {
 	uint32_t imgv[IMG3_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
 
@@ -133,6 +140,69 @@ static void show_img4 (nng_socket sock, struct skitrack2 * s2)
 
 
 	mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE_CONTENT, imgv, IMG3_XN*IMG_YN*sizeof(uint32_t));
+}
+
+
+static void draw_tracklines()
+{
+	/*
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].a, 0.0f, 0.0f, 0.0f);
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].b, 1.0f, 0.0f, 0.0f);
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].a, 0.0f, 0.0f, 0.0f);
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].b, 0.0f, 1.0f, 0.0f);
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].a, 0.0f, 0.0f, 0.0f);
+	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].b, 0.0f, 0.0f, 1.0f);
+	linecol1[VISUAL_LINE_ORIGIN_0].a = RGBA(0xFF, 0x00, 0x00, 0xFF);
+	linecol1[VISUAL_LINE_ORIGIN_0].b = RGBA(0xFF, 0x00, 0x00, 0xFF);
+	linecol1[VISUAL_LINE_ORIGIN_1].a = RGBA(0x00, 0xFF, 0x00, 0xFF);
+	linecol1[VISUAL_LINE_ORIGIN_1].b = RGBA(0x00, 0xFF, 0x00, 0xFF);
+	linecol1[VISUAL_LINE_ORIGIN_2].a = RGBA(0x00, 0x00, 0xFF, 0xFF);
+	linecol1[VISUAL_LINE_ORIGIN_2].b = RGBA(0x00, 0x00, 0xFF, 0xFF);
+	for (int i = VISUAL_LINE_SKITRACK; i <= VISUAL_LINE_SKITRACK_END; ++i)
+	{
+		linecol1[i].a = RGBA(0x77, 0xFF, 0x11, 0xFF);
+		linecol1[i].b = RGBA(0x77, 0xFF, 0x11, 0xFF);
+	}
+	{
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[0] - 10.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[0] + 30.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[1] - 10.0f * s2->k);
+		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[1] + 30.0f * s2->k);
+		float rot[3*3];
+		memcpy (rot, s1->r, sizeof (rot));
+		m3f32_lapacke_inverse (rot, 3);
+		for (float * i = linepos1[VISUAL_LINE_SKITRACK+0].a; i <= linepos1[VISUAL_LINE_SKITRACK_END].b; i += POINT_STRIDE)
+		{
+			mv3f32_mul (i, rot, i);
+			vvf32_add (4, i, i, s1->centroid);
+		}
+	}
+	*/
+}
+
+
+static void draw_pca (nng_socket sock, struct skitrack1 * s1)
+{
+	struct v4f32_line pos[3];
+	struct u32_line col[3];
+	vf32_set3 (pos[0].a, 0.0f   , 0.0f   , 0.0f   );
+	vf32_set3 (pos[0].b, s1->c[0], s1->c[1], s1->c[2]);
+	vf32_set3 (pos[1].a, 0.0f   , 0.0f   , 0.0f   );
+	vf32_set3 (pos[1].b, s1->c[3], s1->c[4], s1->c[5]);
+	vf32_set3 (pos[2].a, 0.0f   , 0.0f   , 0.0f   );
+	vf32_set3 (pos[2].b, s1->c[6], s1->c[7], s1->c[8]);
+	vsf32_mul (4, pos[0].b, pos[0].b, sqrt(s1->w[0])*2.0f);
+	vsf32_mul (4, pos[1].b, pos[1].b, sqrt(s1->w[1])*2.0f);
+	vsf32_mul (4, pos[2].b, pos[2].b, sqrt(s1->w[2])*2.0f);
+	vf32_addv (4, (float*)pos, 4, (float*)pos, 4, s1->centroid, 0, 3*2);
+	col[0].a = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	col[0].b = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	col[1].a = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	col[1].b = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	col[2].a = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	col[2].b = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
+	mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_POS, pos, sizeof(pos));
+	mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_COL, col, sizeof(col));
 }
 
 
@@ -225,12 +295,6 @@ static void show_init (nng_socket sock)
 }
 
 
-
-
-
-
-
-
 static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
 {
 	float pointpos[LIDAR_WH*POINT_STRIDE*2];
@@ -243,6 +307,13 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 	skitrack2_process (s2, s1->pc, s1->pc_count);
 	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
+	for (int i = 0; i < LIDAR_WH*2; ++i)
+	{
+		pointpos[i*POINT_STRIDE + 3] = 10.0f;
+	}
+	//points_test_sinus_slope(pointpos);
+	mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2);
+
 
 	if (flags & VISUAL_MODE_VERBOOSE1)
 	{
@@ -251,120 +322,8 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 		m3f32_print (s1->c, stdout);
 	}
 
-	//Visualize the skitrack and more information:
-	switch (flags & VISUAL_MODE_IMG_MASK)
-	{
-	case VISUAL_MODE_IMG1:
-		image_visual (imgv, s2->img1, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
-		break;
-	case VISUAL_MODE_IMG2:
-		image_visual (imgv, s2->img2, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
-		break;
-	case VISUAL_MODE_IMG3:
-		image_visual (imgv, s2->img3, IMG_XN, IMG_YN, s2->q1, s2->q2, s2->g, SKITRACK2_PEAKS_COUNT, s2->k);
-		break;
-	}
-
-	draw_skitrack (s2, imgv);
-
-
-
-	//pix_rgba[105*IMG_XN + 12] |= RGBA(0x00, 0x66, 0x00, 0x00);
-	//pix_rgba[0*IMG_XN + 1] |= RGBA(0x00, 0xFF, 0x00, 0xFF);
-	//pix_rgba[2*IMG_XN + 0] |= RGBA(0x00, 0xFF, 0xff, 0xFF);
-	//pix_rgba[2*IMG_XN + 1] |= RGBA(0x00, 0xFF, 0xff, 0xFF);
-
-
-
-	/*
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].a, 0.0f, 0.0f, 0.0f);
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].b, 1.0f, 0.0f, 0.0f);
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].a, 0.0f, 0.0f, 0.0f);
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_1].b, 0.0f, 1.0f, 0.0f);
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].a, 0.0f, 0.0f, 0.0f);
-	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_2].b, 0.0f, 0.0f, 1.0f);
-	linecol1[VISUAL_LINE_ORIGIN_0].a = RGBA(0xFF, 0x00, 0x00, 0xFF);
-	linecol1[VISUAL_LINE_ORIGIN_0].b = RGBA(0xFF, 0x00, 0x00, 0xFF);
-	linecol1[VISUAL_LINE_ORIGIN_1].a = RGBA(0x00, 0xFF, 0x00, 0xFF);
-	linecol1[VISUAL_LINE_ORIGIN_1].b = RGBA(0x00, 0xFF, 0x00, 0xFF);
-	linecol1[VISUAL_LINE_ORIGIN_2].a = RGBA(0x00, 0x00, 0xFF, 0xFF);
-	linecol1[VISUAL_LINE_ORIGIN_2].b = RGBA(0x00, 0x00, 0xFF, 0xFF);
-	for (int i = VISUAL_LINE_SKITRACK; i <= VISUAL_LINE_SKITRACK_END; ++i)
-	{
-		linecol1[i].a = RGBA(0x77, 0xFF, 0x11, 0xFF);
-		linecol1[i].b = RGBA(0x77, 0xFF, 0x11, 0xFF);
-	}
-	{
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[0] - 10.0f * s2->k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+0].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[0] + 30.0f * s2->k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].a, IMG_XN, IMG_YN, 0.0f, -10.0f, s2->g[1] - 10.0f * s2->k);
-		pixel_to_point (linepos1[VISUAL_LINE_SKITRACK+1].b, IMG_XN, IMG_YN, 0.0f,  30.0f, s2->g[1] + 30.0f * s2->k);
-		float rot[3*3];
-		memcpy (rot, s1->r, sizeof (rot));
-		m3f32_lapacke_inverse (rot, 3);
-		for (float * i = linepos1[VISUAL_LINE_SKITRACK+0].a; i <= linepos1[VISUAL_LINE_SKITRACK_END].b; i += POINT_STRIDE)
-		{
-			mv3f32_mul (i, rot, i);
-			vvf32_add (4, i, i, s1->centroid);
-		}
-	}
-
-	*/
-
-
-	{
-		struct v4f32_line pos[6];
-		struct u32_line col[6];
-		vf32_set3 (pos[0].a, 0.0f   , 0.0f   , 0.0f   );
-		vf32_set3 (pos[0].b, s1->c[0], s1->c[1], s1->c[2]);
-		vf32_set3 (pos[1].a, 0.0f   , 0.0f   , 0.0f   );
-		vf32_set3 (pos[1].b, s1->c[3], s1->c[4], s1->c[5]);
-		vf32_set3 (pos[2].a, 0.0f   , 0.0f   , 0.0f   );
-		vf32_set3 (pos[2].b, s1->c[6], s1->c[7], s1->c[8]);
-		vsf32_mul (4, pos[0].b, pos[0].b, sqrt(s1->w[0])*2.0f);
-		vsf32_mul (4, pos[1].b, pos[1].b, sqrt(s1->w[1])*2.0f);
-		vsf32_mul (4, pos[2].b, pos[2].b, sqrt(s1->w[2])*2.0f);
-		vf32_addv (4, pos, 4, pos, 4, s1->centroid, 0, 12);
-		col[0].a = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		col[0].b = RGBA(0xFF, 0x00, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		col[1].a = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		col[1].b = RGBA(0x00, 0xFF, 0x00, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		col[2].a = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		col[2].b = RGBA(0x00, 0x00, 0xFF, 0xFF) | RGBA(0xAA, 0xAA, 0xAA, 0xFF);
-		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_POS, pos, sizeof(pos));
-		mg_send_set (sock, MYENT_DRAW_LINES, MG_LINES_COL, col, sizeof(col));
-	}
-
-
-
-	show_img2 (sock, s1, flags);
-	show_img4 (sock, s2);
-
-	//Send visual information to the graphic server:
-	{
-		for (int i = 0; i < LIDAR_WH*2; ++i)
-		{
-			//pointpos[i + 0] = 10.0f;
-			//pointpos[i + 1] = 10.0f;
-			//pointpos[i + 2] = 10.0f;
-			pointpos[i*POINT_STRIDE + 3] = 10.0f;
-		}
-		//points_test_sinus_slope(pointpos);
-		mg_send_set (sock, MYENT_TEXTURE1, MG_TEXTURE_CONTENT, imgv, IMG_XN*IMG_YN*sizeof(uint32_t));
-		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2);
-	}
-
-	/*
-	r = nng_send (socks[MAIN_NNGSOCK_LINE_POS], linepos1, VISUAL_LINE_COUNT*POINT_STRIDE*2*sizeof(float), 0);
-	if (r) {perror (nng_strerror (r));}
-	r = nng_send (socks[MAIN_NNGSOCK_LINE_COL], linecol1, VISUAL_LINE_COUNT*2*sizeof(uint32_t), 0);
-	if (r) {perror (nng_strerror (r));}
-	r = nng_send (socks[MAIN_NNGSOCK_POINTCLOUD_POS], pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*2, 0);
-	if (r) {perror (nng_strerror (r));}
-	r = nng_send (socks[MAIN_NNGSOCK_POINTCLOUD_COL], pointcol, LIDAR_WH*sizeof(uint32_t)*2, 0);
-	if (r) {perror (nng_strerror (r));}
-	r = nng_send (socks[MAIN_NNGSOCK_GROUNDPROJECTION], imgv, IMG_XN*IMG_YN*sizeof(uint32_t), 0);
-	if (r) {perror (nng_strerror (r));}
-	*/
-
+	draw_skitrack (sock, s2, imgv, flags);
+	draw_pca (sock, s1);
+	draw_img2 (sock, s1, flags);
+	draw_img4 (sock, s2);
 }
