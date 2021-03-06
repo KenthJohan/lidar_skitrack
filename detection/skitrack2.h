@@ -32,18 +32,25 @@
 */
 struct skitrack2
 {
-	float img1[IMG_XN*IMG_YN];//Projected points
+	//2D images:
+	float imgf[IMG_XN*IMG_YN];//Used for normalizing pixel
+	float img1[IMG_XN*IMG_YN];//From projected points
 	float img2[IMG_XN*IMG_YN];//Convolution from img1
 	float img3[IMG_XN*IMG_YN];//Convolution from img2
-	float imgf[IMG_XN*IMG_YN];//Used for normalizing pixel
+
+	//1D images:
 	float q1[IMG_YN];
 	float q2[IMG_YN];
 	float q3[IMG_YN];
 	float q4[IMG_YN];
-	uint32_t g[SKITRACK2_PEAKS_COUNT];
+
+	//Peaks index locations:
 	float g1[SKITRACK2_PEAKS_COUNT];
 	float g2[SKITRACK2_PEAKS_COUNT];
 	float g3[SKITRACK2_PEAKS_COUNT];
+	float go[SKITRACK2_PEAKS_COUNT];
+
+	//Skitrack direction (x, x + k*y):
 	float k;
 };
 
@@ -56,7 +63,6 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are:
 	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, pc_count);
-
 
 	//Amplify skitrack pattern in the 2D image:
 	{
@@ -75,9 +81,10 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 		vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
-
-
-	//vf32_remove_low_values (img2, IMG_XN*IMG_YN);
+	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
+	{
+		s->img2[i] = CLAMP (s->img2[i], -0.05f, 0.03f);
+	}
 
 
 	//Smooth filter:
@@ -94,22 +101,15 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 		vf32_convolution2d (s->img3, s->img2, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
-
-	//vf32_remove_low_values (img3, IMG_XN*IMG_YN);
-	//memcpy (img3, img2, sizeof(img3));
-
-
 	//Find the most common lines direction in the image which hopefully matches the direction of the skitrack:
 	//Project 2D image to a 1D image in the the most common direction (k):
-	//float k = vf32_most_common_line (img3, IMG_XN, IMG_YN, 20);
 	s->k = vf32_most_common_line2 (s->img3, IMG_XN, IMG_YN, s->q1);
-	//vf32_project_2d_to_1d (img3, IMG_XN, IMG_YN, k, q1);
-	vf32_project_2d_to_1d_pn (s->img3, IMG_XN, IMG_YN, s->k, s->q1);
+	vf32_project_2d_to_1d (s->img3, IMG_XN, IMG_YN, s->k, s->q1);
 	vf32_remove_low_values (s->q1, IMG_YN);
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
-		//s->q2[i] = s->q1[i] * s->q1[i] * 1.0f;
 		s->q2[i] = fabs(s->q1[i]);
+		s->q4[i] += fabs(s->q1[i]) * 0.15f;
 	}
 	float skitrack_kernel1d_a[] =
 	{
@@ -117,56 +117,66 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	};
 	vf32_convolution1d (s->q2, IMG_YN, s->q3, skitrack_kernel1d_a, countof (skitrack_kernel1d_a));
 
-	/*
-	//Amplify skitrack pattern in the 1D image:
-	float skitrack_kernel1d[] =
+	//Remove foot tracks
+	for (uint32_t i = 3; i < IMG_YN-3; ++i)
 	{
-	 1.0f,  3.0f,  1.0f,
-	-3.0f, -9.0f, -3.0f,
-	 1.0f,  14.0f,  1.0f,
-	-3.0f, -9.0f, -3.0f,
-	 1.0f,  3.0f,  1.0f
-	};
-	vf32_convolution1d (s->q1, IMG_YN, s->q2, skitrack_kernel1d, countof (skitrack_kernel1d));
-	*/
-
-	//vf32_weight_ab (IMG_YN, s->q3, s->q3, s->q2, 0.5f);
-
-	for (uint32_t i = 0; i < IMG_YN; ++i)
-	{
-		if(s->q1[i] < 0.0f)
+		s->q3[i] += s->q4[i];
+		if (s->q1[i] < 0.0f)
 		{
 			s->q3[i] = 0.0f;
 		}
+
 	}
+
+
 	//Find the peaks which should be where the skitrack is positioned:
 	{
 		float q[IMG_YN] = {0.0f};
 		memcpy (q, s->q3, sizeof (q));
-		vf32_find_peaks (q, IMG_YN, s->g, SKITRACK2_PEAKS_COUNT, 16, 20);
+		uint32_t g[SKITRACK2_PEAKS_COUNT];
+		vf32_find_peaks (q, IMG_YN, g, SKITRACK2_PEAKS_COUNT, 16, 20);
+		for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
+		{
+			s->go[0] = CLAMP (g[i], 10, IMG_YN-10);
+		}
 	}
-	//Need float
-	s->g1[0] = s->g[0];
 
 
 
-	if(fabs(s->g2[0] - s->g1[0]) < 10.0f)
-	{
-		s->g3[0] = s->g1[0];
-	}
-	s->g2[0] = s->g1[0];
 
 
 
 	//Exponential Moving Average (EMA) filter:
-	//for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
+	/*
+	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		//float k = 0.7f;
-		//s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
+		float k = 0.7f;
+		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
+	}
+	*/
+
+
+
+
+	{
+		int32_t o = s->go[0];
+		int32_t w = 12;
+		int32_t a = MAX (o-w, 0);
+		int32_t b = MIN (o+w, IMG_YN);
+		for (int32_t i = 0; i < IMG_YN; ++i)
+		{
+			s->q4[i] += -0.03f;
+		}
+		for (int32_t i = a; i < b; ++i)
+		{
+			if (s->q4[i] < 0.0f) {s->q4[i] = 0.0f;}
+			s->q4[i] += 0.001f;
+		}
+		for (int32_t i = 0; i < IMG_YN; ++i)
+		{
+			s->q4[i] = CLAMP(s->q4[i], -1.0f, 1.0f);
+		}
 	}
 
 
-
-	//vf32_normalize (countof (q1), q1, q1);
-	//vf32_normalize (countof (q2), q2, q2);
 }

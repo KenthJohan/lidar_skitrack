@@ -20,18 +20,6 @@
 #include "skitrack2.h"
 
 
-enum visual_line
-{
-	VISUAL_LINE_ORIGIN_0,
-	VISUAL_LINE_ORIGIN_1,
-	VISUAL_LINE_ORIGIN_2,
-	VISUAL_LINE_PCA_0,
-	VISUAL_LINE_PCA_1,
-	VISUAL_LINE_PCA_2,
-	VISUAL_LINE_SKITRACK,
-	VISUAL_LINE_SKITRACK_END = VISUAL_LINE_SKITRACK + SKITRACK2_PEAKS_COUNT - 1,
-	VISUAL_LINE_COUNT
-};
 
 
 #define VISUAL_MODE_IMG_MASK          UINT32_C(0x0000000F)
@@ -72,9 +60,9 @@ static void draw_skitrack (nng_socket sock, struct skitrack2 * s2, uint32_t img[
 	}
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		if (s2->g1[i] < IMG_YN)
+		if (s2->go[i] < IMG_YN)
 		{
-			uint32_t y = s2->g3[i];
+			uint32_t y = s2->go[i];
 			for (uint32_t x = 0; x < IMG_XN; ++x)
 			{
 				float yy = (float)y + (float)x * s2->k;

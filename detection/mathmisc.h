@@ -113,7 +113,13 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 
 
 
-
+/**
+ * @brief Projects pixels from a 2D image to a 1D image in direction \p k
+ * @param xn[in] Width of 2D image
+ * @param yn[in] Height  of 2D image
+ * @param k[in]  Direction. P(x,y) = img2D(x, y + x*k)
+ * @param q[out] The 1D image.
+ */
 void vf32_project_2d_to_1d (float p[], uint32_t xn, uint32_t yn, float k, float q[])
 {
 	for (uint32_t y = 0; y < yn; ++y)
@@ -130,12 +136,8 @@ void vf32_project_2d_to_1d (float p[], uint32_t xn, uint32_t yn, float k, float 
 			ASSERT (index < xn*yn);
 			sum += p[index];
 		}
-		//p[y*xn+0] = sum * (1.0f / (float)xn);
 		float val = sum;
 		q[y] = val;
-		//float yy = (float)y + ((float)xn-1.0f)*k;
-		//yy = CLAMP (yy, 0, yn);
-		//q[(int)yy] = val;
 	}
 }
 
@@ -152,9 +154,8 @@ void vf32_project_2d_to_1d_pn (float const p[], uint32_t xn, uint32_t yn, float 
 {
 	for (uint32_t y = 0; y < yn; ++y)
 	{
-		//float sump = 0.0f;
-		//float sumn = 0.0f;
-		float sum = 0.0f;
+		float sump = 0.0f;
+		float sumn = 0.0f;
 		for (uint32_t x = 0; x < xn; ++x)
 		{
 			float yy = (float)y + (float)x*k;
@@ -164,7 +165,6 @@ void vf32_project_2d_to_1d_pn (float const p[], uint32_t xn, uint32_t yn, float 
 			ASSERT (yy < (float)yn);
 			uint32_t index = (uint32_t)yy*xn + x;
 			ASSERT (index < xn*yn);
-			/*
 			if (p[index] > 0.0f)
 			{
 				sump += 1;
@@ -173,16 +173,9 @@ void vf32_project_2d_to_1d_pn (float const p[], uint32_t xn, uint32_t yn, float 
 			{
 				sumn += 1;
 			}
-			*/
-			sum += p[index];
 		}
-		//p[y*xn+0] = sum * (1.0f / (float)xn);
-		//float val = (sump - sumn) / xn;
-		float val = (sum) / xn;
-		q[y] = val*10.0f;
-		//float yy = (float)y + ((float)xn-1.0f)*k;
-		//yy = CLAMP (yy, 0, yn);
-		//q[(int)yy] = val;
+		float val = (sump - sumn) / xn;
+		q[y] = val;
 	}
 }
 

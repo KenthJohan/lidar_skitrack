@@ -50,6 +50,7 @@ int main (int argc, char const * argv[])
 	uint32_t arg_visualmode = 1;
 	uint32_t arg_showflags = 0;
 	uint32_t arg_usleep = 0;
+	uint32_t arg_frame = 0;
 	struct csc_argv_option option[] =
 	{
 	{'a', "address",         CSC_TYPE_STRING, &arg_address,    0,                   "The address to send to"},
@@ -59,6 +60,7 @@ int main (int argc, char const * argv[])
 	{'i', "input",           CSC_TYPE_U32,    &arg_flags,      ARG_STDIN,           "Get pointcloud from stdin"},
 	{'L', "legacy_filename", CSC_TYPE_U32,    &arg_flags,      ARG_LEGACY_FILENAME, "ARG_LEGACY_FILENAME"},
 	{'m', "mode",            CSC_TYPE_U32,    &arg_visualmode, 0,                   "The visual mode"},
+	{'F', "frame",           CSC_TYPE_U32,    &arg_frame,      0,                   "The starting frame"},
 	{'c', "ctrlmode",        CSC_TYPE_U32,    &arg_flags,      ARG_CTRLMODE,        "Step forward foreach keypress"},
 	{'d', "duration",        CSC_TYPE_U32,    &arg_usleep,     0,                   "Duration for each frame"},
 	CSC_ARGV_END};
@@ -107,9 +109,11 @@ int main (int argc, char const * argv[])
 	{
 		printf ("[INFO] Opening binary file %s to read LiDAR frames.\n", arg_filename);
 		FILE * f = fopen (arg_filename, "rb");
+		fseek (f, arg_frame * sizeof (float) * LIDAR_WH * POINT_STRIDE, SEEK_SET);
 		ASSERT_NOTNULL (f);
 		while (1)
 		{
+			printf ("[INFO] frame: %f\n", (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE));
 			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, f);
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
