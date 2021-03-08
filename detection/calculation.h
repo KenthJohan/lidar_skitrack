@@ -16,8 +16,7 @@
 #include "mg_send.h"
 #include "myent.h"
 
-#include "skitrack1.h"
-#include "skitrack2.h"
+#include "skitrack.h"
 
 
 
@@ -43,7 +42,7 @@ static void convert_float_to_rgba (uint32_t img[], float pix[], uint32_t n)
 }
 
 
-static void draw_skitrack (nng_socket sock, struct skitrack2 * s2, uint32_t img[], uint32_t flags)
+static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[], uint32_t flags)
 {
 	//Visualize the skitrack and more information:
 	switch (flags & VISUAL_MODE_IMG_MASK)
@@ -80,7 +79,7 @@ static void draw_skitrack (nng_socket sock, struct skitrack2 * s2, uint32_t img[
 }
 
 
-static void draw_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
+static void draw_img2 (nng_socket sock, struct skitrack * s1, uint32_t flags)
 {
 	float m[4*4] = {0.0f};
 	//m4f32_identity (m);
@@ -104,7 +103,7 @@ static void draw_img2 (nng_socket sock, struct skitrack1 * s1, uint32_t flags)
 }
 
 
-static void draw_img4 (nng_socket sock, struct skitrack2 * s2)
+static void draw_img4 (nng_socket sock, struct skitrack * s2)
 {
 	uint32_t imgv[IMG3_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
 
@@ -113,7 +112,7 @@ static void draw_img4 (nng_socket sock, struct skitrack2 * s2)
 		imgv[y+IMG_YN*0] = rgba_value (s2->q1[y], -100.0f, 100.0f, 0.0f);
 		imgv[y+IMG_YN*1] = rgba_value (s2->q2[y], -100.0f, 100.0f, 0.0f);
 		imgv[y+IMG_YN*2] = rgba_value (s2->q3[y], -100.0f, 100.0f, 0.0f);
-		imgv[y+IMG_YN*3] = rgba_value (s2->q4[y], -100.0f, 100.0f, 0.0f);
+		imgv[y+IMG_YN*3] = rgba_value (s2->qmem[y], -100.0f, 100.0f, 0.0f);
 		/*
 		if (s2->q1[y] == 0)
 		{
@@ -169,7 +168,7 @@ static void draw_tracklines()
 }
 
 
-static void draw_pca (nng_socket sock, struct skitrack1 * s1)
+static void draw_pca (nng_socket sock, struct skitrack * s1)
 {
 	struct v4f32_line pos[3];
 	struct u32_line col[3];
@@ -282,37 +281,43 @@ static void show_init (nng_socket sock)
 
 }
 
-#define PC1 LIDAR_WH*POINT_STRIDE*0
-#define PC2 LIDAR_WH*POINT_STRIDE*1
-#define PC3 LIDAR_WH*POINT_STRIDE*2
 
-static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock, uint32_t flags)
+static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 {
-	float pointpos[LIDAR_WH*POINT_STRIDE*3];
-	memset (pointpos, 0, sizeof(pointpos));
-	uint32_t imgv[IMG_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
+	//Used for visual confirmation of the algorithm internal workings:
+	struct
+	{
+		float cloud1[LIDAR_WH*POINT_STRIDE];
+		float cloud2[LIDAR_WH*POINT_STRIDE];
+		float cloud3[LIDAR_WH*POINT_STRIDE];
+	} points;
+	memset (&points, 0, sizeof(points));
+	uint32_t imgv[IMG_XN*IMG_YN] = {0};
+
 
 	//points_test_sinus_slope (s1->pc);
 
-	memcpy (pointpos, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
-	skitrack1_process (s1);
-	skitrack2_process (s2, s1->pc, s1->pc_count);
-	memcpy (pointpos + LIDAR_WH*POINT_STRIDE, s1->pc, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	//Copy unrectified pointcloud:
+	memcpy (points.cloud1, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	skitrack_process (s2);
+	//Copy rectified pointcloud:
+	memcpy (points.cloud2, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	memcpy (points.cloud3, s2->pc2, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
-
+	for (int i = 0; i < LIDAR_WH; ++i)
 	{
-		int32_t o = s2->go[0];//Skitrack position
-		int32_t w = 12;
-		int32_t a = MAX (o-w, 0);
-		int32_t b = MIN (o+w, IMG_YN);
-		s1->pc_count = pointcloud_subset (s2->img1, s1->pc, a, b);
-		memcpy (pointpos + PC3, s1->pc, s1->pc_count*POINT_STRIDE*sizeof(float));
-		for (uint32_t i = 0; i < s1->pc_count; ++i)
-		{
-			pointpos[PC3 + i*POINT_STRIDE + 2] += 0.5f;
-			pointpos[PC3 + i*POINT_STRIDE + 3] = 20.0f;
-		}
+		points.cloud1[i*POINT_STRIDE + 3] = 10.0f; //Set the size of the points
 	}
+	for (int i = 0; i < LIDAR_WH; ++i)
+	{
+		points.cloud2[i*POINT_STRIDE + 3] = 10.0f; //Set the size of the points
+	}
+	for (uint32_t i = 0; i < LIDAR_WH; ++i)
+	{
+		points.cloud3[i*POINT_STRIDE + 2] += 0.5f; //Move pointcloud up a little
+		points.cloud3[i*POINT_STRIDE + 3] = 20.0f; //Set the size of the points
+	}
+
 
 
 	/*
@@ -329,24 +334,21 @@ static void show (struct skitrack1 * s1, struct skitrack2 * s2, nng_socket sock,
 
 
 
-	for (int i = 0; i < LIDAR_WH*2; ++i)
-	{
-		pointpos[i*POINT_STRIDE + 3] = 10.0f;
-	}
+
 	//points_test_sinus_slope(pointpos);
-	mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, pointpos, LIDAR_WH*POINT_STRIDE*sizeof(float)*3);
+	mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_POS, &points, sizeof(points));
 
 
 	if (flags & VISUAL_MODE_VERBOOSE1)
 	{
-		printf ("[INFO] Centroid: %f %f %f\n", s1->centroid[0], s1->centroid[1], s1->centroid[2]);
-		printf ("[INFO] Eigen values: %f %f %f\n", s1->w[0], s1->w[1], s1->w[2]);
+		printf ("[INFO] Centroid: %f %f %f\n", s2->centroid[0], s2->centroid[1], s2->centroid[2]);
+		printf ("[INFO] Eigen values: %f %f %f\n", s2->w[0], s2->w[1], s2->w[2]);
 		printf ("[INFO] Eigen column vectors:\n");
-		m3f32_print (s1->c, stdout);
+		m3f32_print (s2->c, stdout);
 	}
 
 	draw_skitrack (sock, s2, imgv, flags);
-	draw_pca (sock, s1);
-	draw_img2 (sock, s1, flags);
+	draw_pca (sock, s2);
+	draw_img2 (sock, s2, flags);
 	draw_img4 (sock, s2);
 }

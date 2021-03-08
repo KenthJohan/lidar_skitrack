@@ -85,25 +85,24 @@ int main (int argc, char const * argv[])
 	show_init (sock);
 
 
-	struct skitrack1 s1 = {0};
-	struct skitrack2 s2 = {0};
+	struct skitrack ski = {0};
 	if (arg_flags & ARG_STDIN)
 	{
 		printf ("[INFO] Opening stdin to read LiDAR frames continuously.\n");
 		while (1)
 		{
-			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, stdin);
+			int r = fread (ski.pc1, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, stdin);
 			ASSERTF (r == 1, "%i", r);
-			s1.pc_count = LIDAR_WH;
-			show (&s1, &s2, sock, arg_showflags);
+			ski.pc_count = LIDAR_WH;
+			show (&ski, sock, arg_showflags);
 		}
 	}
 	else if ((arg_flags & ARG_LEGACY_FILENAME) && arg_filename)
 	{
 		printf ("[INFO] Opening legacy file %s to read LiDAR frames.\n", arg_filename);
-		legacy_points_read_filename (arg_filename, s1.pc, &s1.pc_count);
-		printf ("[INFO] pc_count %i\n", s1.pc_count);
-		show (&s1, &s2, sock, arg_showflags);
+		legacy_points_read_filename (arg_filename, ski.pc1, &ski.pc_count);
+		printf ("[INFO] pc_count %i\n", ski.pc_count);
+		show (&ski, sock, arg_showflags);
 	}
 	else if (arg_filename)
 	{
@@ -114,10 +113,10 @@ int main (int argc, char const * argv[])
 		while (1)
 		{
 			printf ("[INFO] frame: %f\n", (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE));
-			int r = fread (s1.pc, sizeof (float) * POINT_STRIDE * LIDAR_WH, 1, f);
+			int r = fread (ski.pc1, sizeof (float) * POINT_STRIDE * LIDAR_WH, 1, f);
 			ASSERTF (r == 1, "%i", r);
-			s1.pc_count = LIDAR_WH;
-			show (&s1, &s2, sock, arg_showflags);
+			ski.pc_count = LIDAR_WH;
+			show (&ski, sock, arg_showflags);
 			if (arg_flags & ARG_CTRLMODE)
 			{
 				getchar();

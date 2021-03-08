@@ -30,8 +30,17 @@
 	16: Find all peaks                  : (1D image) -> ((position), (strength))
 	17: Output of skitrack position     : ((position), (strength))
 */
-struct skitrack2
+struct skitrack
 {
+	uint32_t pc_count;//Number of points in pointcloud
+	float pc1[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
+	uint32_t pc2_count;//Number of points in pointcloud
+	float pc2[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
+	float w[3];//Eigen values
+	float c[3*3];//Covariance matrix first then 3x eigen vectors
+	float r[3*3];//Rotation matrix
+	float centroid[3];//Center point of pointcloud
+
 	//2D images:
 	float imgf[IMG_XN*IMG_YN];//Used for normalizing pixel
 	float img1[IMG_XN*IMG_YN];//From projected points
@@ -42,7 +51,7 @@ struct skitrack2
 	float q1[IMG_YN];
 	float q2[IMG_YN];
 	float q3[IMG_YN];
-	float q4[IMG_YN];
+	float qmem[IMG_YN];
 
 	//Peaks index locations:
 	//float g1[SKITRACK2_PEAKS_COUNT];
@@ -56,39 +65,42 @@ struct skitrack2
 
 
 
-//Calculate Local PCA plane:
-static uint32_t pointcloud_subset (float const img[], float pc[], uint32_t y0, uint32_t y1)
-{
-	uint32_t count = 0;
-	for (uint32_t x = 0; x < IMG_XN; ++x)
-	{
-		for (uint32_t y = y0; y < y1; ++y)
-		{
-			uint32_t index = ((uint32_t)y * IMG_XN) + (uint32_t)x;
-			float * p = pc + POINT_STRIDE * count;
-			pixel_to_point (p, IMG_XN, IMG_YN, img[index]*2.0f, x, y);
-			count++;
-		}
-	}
-	return count;
-}
 
 
 
-static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_count)
+static void skitrack_process (struct skitrack * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
 
+	//Remove bad points:
+	pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, &s->pc_count, POINT_DIM, 1.0f);
+
+	//Move pointcloud to the origin and rotate it:
+	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
+	float aux[LIDAR_WH*POINT_STRIDE];
+	pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+
+
+	/*
+	//Clamp points:
+	for (uint32_t i = 0; i < LIDAR_WH; ++i)
+	{
+		s->pc1[i*POINT_STRIDE+2] = CLAMP (s->pc1[i*POINT_STRIDE+2], -0.05f, 0.03f);
+	}
+	*/
+
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are:
-	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, pc_count);
+	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, POINT_STRIDE, s->pc_count);
 
 
 
 	//Amplify skitrack pattern in the 2D image:
+	//https://en.wikipedia.org/wiki/Sobel_operator
 	{
 		int32_t kxn = 1;
 		int32_t kyn = 6;
+		//Kernel must sum up to zero!
 		float kernel[1*6] =
 		{
 		-8.0f,
@@ -102,13 +114,14 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 		vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
+	//Clamp
 	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
 	{
 		s->img2[i] = CLAMP (s->img2[i], -0.05f, 0.03f);
 	}
 
 
-	//Smooth filter:
+	//Smooth filter, do we really need this?:
 	{
 		int32_t kxn = 3;
 		int32_t kyn = 3;
@@ -130,24 +143,29 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
 		s->q2[i] = fabs(s->q1[i]);
-		s->q4[i] += fabs(s->q1[i]) * 0.15f;
+		s->qmem[i] += fabs(s->q1[i]) * 0.15f;
 	}
 
+	//Creates a peak where the skitrack is located:
 	{
-		float k[] = {1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f};
-		vf32_convolution1d (s->q2, IMG_YN, s->q3, k, countof (k));
+		float kernel[] = {1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f};
+		vf32_convolution1d (s->q2, IMG_YN, s->q3, kernel, countof (kernel));
 	}
 
-	//Remove foot tracks
+	//Apply the skitrack memory:
 	for (uint32_t i = 3; i < IMG_YN-3; ++i)
 	{
-		s->q3[i] += s->q4[i];
+		s->q3[i] += s->qmem[i];
+	}
+
+	//Remove feet tracks
+	for (uint32_t i = 3; i < IMG_YN-3; ++i)
+	{
 		if (s->q1[i] < 0.0f)
 		{
 			s->q3[i] = 0.0f;
 		}
 	}
-
 
 	//Find the peaks which should be where the skitrack is positioned:
 	{
@@ -179,24 +197,42 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 
 
 	{
-		int32_t o = s->go[0];
+		//Memory functionality of the skitrack:
+		int32_t o = s->go[0];//Get index location of the peak 0
+		int32_t w = 12;//Memory radius around skitrack
+		int32_t a = MAX (o-w, 0);//Start index
+		int32_t b = MIN (o+w, IMG_YN);//Stop index
+		//Decrease kitrack memory:
+		for (int32_t i = 0; i < IMG_YN; ++i)
+		{
+			s->qmem[i] += -0.03f;
+		}
+		//Reset memory around skitrack:
+		//Increase skitrack memory:
+		for (int32_t i = a; i < b; ++i)
+		{
+			if (s->qmem[i] < 0.0f) {s->qmem[i] = 0.0f;}
+			s->qmem[i] += 0.001f;//
+		}
+		//Clamp skitrack memory:
+		for (int32_t i = 0; i < IMG_YN; ++i)
+		{
+			s->qmem[i] = CLAMP(s->qmem[i], -1.0f, 1.0f);
+		}
+	}
+
+
+
+	//Experiment of subset point to make a local PCA plane:
+	{
+		int32_t o = s->go[0];//Skitrack position
 		int32_t w = 12;
 		int32_t a = MAX (o-w, 0);
 		int32_t b = MIN (o+w, IMG_YN);
-		for (int32_t i = 0; i < IMG_YN; ++i)
-		{
-			s->q4[i] += -0.03f;
-		}
-		for (int32_t i = a; i < b; ++i)
-		{
-			if (s->q4[i] < 0.0f) {s->q4[i] = 0.0f;}
-			s->q4[i] += 0.001f;
-		}
-		for (int32_t i = 0; i < IMG_YN; ++i)
-		{
-			s->q4[i] = CLAMP(s->q4[i], -1.0f, 1.0f);
-		}
+		s->pc2_count = pointcloud_subset (s->img1, s->pc2, a, b);
 	}
+
+
 
 
 }
