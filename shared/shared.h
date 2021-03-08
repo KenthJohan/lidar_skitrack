@@ -17,6 +17,7 @@
 #define RGBA(r,g,b,a) (((r) << 0) | ((g) << 8) | ((b) << 16) | ((a) << 24))
 
 #define POINT_STRIDE 4
+#define POINT_DIM 3
 
 #define LIDAR_W 320
 #define LIDAR_H 20

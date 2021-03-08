@@ -54,10 +54,7 @@ struct skitrack
 	float qmem[IMG_YN];
 
 	//Peaks index locations:
-	//float g1[SKITRACK2_PEAKS_COUNT];
-	//float g2[SKITRACK2_PEAKS_COUNT];
-	//float g3[SKITRACK2_PEAKS_COUNT];
-	float go[SKITRACK2_PEAKS_COUNT];
+	float peak[SKITRACK2_PEAKS_COUNT];
 
 	//Skitrack direction (x, x + k*y):
 	float k;
@@ -77,9 +74,10 @@ static void skitrack_process (struct skitrack * s)
 
 	//Move pointcloud to the origin and rotate it:
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
-	float aux[LIDAR_WH*POINT_STRIDE];
-	pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
-
+	{
+		float aux[LIDAR_WH*POINT_STRIDE];
+		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+	}
 
 	/*
 	//Clamp points:
@@ -90,12 +88,12 @@ static void skitrack_process (struct skitrack * s)
 	*/
 
 	//Project 3D points to a 2D image:
-	//The center of the image is put ontop of the origin where all points are:
+	//The center of the image is put ontop of the origin where all points are located:
 	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, POINT_STRIDE, s->pc_count);
 
 
 
-	//Amplify skitrack pattern in the 2D image:
+	//Amplify skitrack patterns in the 2D image:
 	//https://en.wikipedia.org/wiki/Sobel_operator
 	{
 		int32_t kxn = 1;
@@ -114,7 +112,7 @@ static void skitrack_process (struct skitrack * s)
 		vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
-	//Clamp
+	//Noise must not get larger than height of skitracks:
 	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
 	{
 		s->img2[i] = CLAMP (s->img2[i], -0.05f, 0.03f);
@@ -135,30 +133,39 @@ static void skitrack_process (struct skitrack * s)
 		vf32_convolution2d (s->img3, s->img2, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
-	//Find the most common lines direction in the image which hopefully matches the direction of the skitrack:
-	//Project 2D image to a 1D image in the the most common direction (k):
+	//Find the most common direction in the image which hopefully is parallel to skitracks:
 	s->k = vf32_most_common_line2 (s->img3, IMG_XN, IMG_YN, s->q1);
+
+	//Project 2D image to a 1D image in the the most common direction (k):
 	vf32_project_2d_to_1d (s->img3, IMG_XN, IMG_YN, s->k, s->q1);
+
 	vf32_remove_low_values (s->q1, IMG_YN);
+
+	//
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
 		s->q2[i] = fabs(s->q1[i]);
+	}
+
+	//Slowly change the skitrack memory for new information:
+	for (uint32_t i = 0; i < IMG_YN; ++i)
+	{
 		s->qmem[i] += fabs(s->q1[i]) * 0.15f;
 	}
 
-	//Creates a peak where the skitrack is located:
+	//Try to create a peak where the skitrack is located:
 	{
 		float kernel[] = {1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f};
 		vf32_convolution1d (s->q2, IMG_YN, s->q3, kernel, countof (kernel));
 	}
 
-	//Apply the skitrack memory:
+	//Apply skitrack memory:
 	for (uint32_t i = 3; i < IMG_YN-3; ++i)
 	{
 		s->q3[i] += s->qmem[i];
 	}
 
-	//Remove feet tracks
+	//Remove feet tracks which makes the peak finder ignore feet tracks completly:
 	for (uint32_t i = 3; i < IMG_YN-3; ++i)
 	{
 		if (s->q1[i] < 0.0f)
@@ -167,38 +174,22 @@ static void skitrack_process (struct skitrack * s)
 		}
 	}
 
-	//Find the peaks which should be where the skitrack is positioned:
+	//Find local peaks which is estimated skitracks position:
 	{
 		float q[IMG_YN] = {0.0f};
 		memcpy (q, s->q3, sizeof (q));
-		uint32_t g[SKITRACK2_PEAKS_COUNT];
-		vf32_find_peaks (q, IMG_YN, g, SKITRACK2_PEAKS_COUNT, 16, 20);
+		uint32_t peak_u32[SKITRACK2_PEAKS_COUNT];
+		vf32_find_peaks (q, IMG_YN, peak_u32, SKITRACK2_PEAKS_COUNT, 16, 20);
 		for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 		{
-			s->go[0] = CLAMP (g[i], 10, IMG_YN-10);
+			s->peak[i] = CLAMP (peak_u32[i], 10, IMG_YN-10);
 		}
 	}
 
 
-
-
-
-
-	//Exponential Moving Average (EMA) filter:
-	/*
-	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
+	//Memory functionality of the skitrack:
 	{
-		float k = 0.7f;
-		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
-	}
-	*/
-
-
-
-
-	{
-		//Memory functionality of the skitrack:
-		int32_t o = s->go[0];//Get index location of the peak 0
+		int32_t o = s->peak[0];//Get index location of the peak 0
 		int32_t w = 12;//Memory radius around skitrack
 		int32_t a = MAX (o-w, 0);//Start index
 		int32_t b = MIN (o+w, IMG_YN);//Stop index
@@ -208,11 +199,16 @@ static void skitrack_process (struct skitrack * s)
 			s->qmem[i] += -0.03f;
 		}
 		//Reset memory around skitrack:
+		for (int32_t i = a; i < b; ++i)
+		{
+			if (s->qmem[i] < 0.0f) {s->qmem[i] = 0.0f;}
+			s->qmem[i] += 0.001f;
+		}
 		//Increase skitrack memory:
 		for (int32_t i = a; i < b; ++i)
 		{
 			if (s->qmem[i] < 0.0f) {s->qmem[i] = 0.0f;}
-			s->qmem[i] += 0.001f;//
+			s->qmem[i] += 0.001f;
 		}
 		//Clamp skitrack memory:
 		for (int32_t i = 0; i < IMG_YN; ++i)
@@ -225,7 +221,7 @@ static void skitrack_process (struct skitrack * s)
 
 	//Experiment of subset point to make a local PCA plane:
 	{
-		int32_t o = s->go[0];//Skitrack position
+		int32_t o = s->peak[0];//Skitrack position
 		int32_t w = 12;
 		int32_t a = MAX (o-w, 0);
 		int32_t b = MIN (o+w, IMG_YN);
@@ -233,6 +229,13 @@ static void skitrack_process (struct skitrack * s)
 	}
 
 
-
+	//Exponential Moving Average (EMA) filter:
+	/*
+	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
+	{
+		float k = 0.7f;
+		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
+	}
+	*/
 
 }

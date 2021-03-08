@@ -59,9 +59,9 @@ static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[]
 	}
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		if (s2->go[i] < IMG_YN)
+		if (s2->peak[i] < IMG_YN)
 		{
-			uint32_t y = s2->go[i];
+			uint32_t y = s2->peak[i];
 			for (uint32_t x = 0; x < IMG_XN; ++x)
 			{
 				float yy = (float)y + (float)x * s2->k;
@@ -262,9 +262,11 @@ static void show_init (nng_socket sock)
 
 	{
 		//The color of each point. This is only used for visualization.
-		uint32_t pointcol[LIDAR_WH*2];
-		vu32_set1 (LIDAR_WH*2, pointcol, 0xFFFFFFFF);
-		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_COL, pointcol, LIDAR_WH*sizeof(uint32_t)*2);
+		uint32_t pointcol[LIDAR_WH*3];
+		vu32_set1 (LIDAR_WH*1, pointcol+LIDAR_WH*0, 0xFFFFFFFF);
+		vu32_set1 (LIDAR_WH*1, pointcol+LIDAR_WH*1, 0xFFFFFF88);
+		vu32_set1 (LIDAR_WH*1, pointcol+LIDAR_WH*2, 0xFF88FFFF);
+		mg_send_set (sock, MYENT_DRAW_CLOUD, MG_POINTCLOUD_COL, pointcol, LIDAR_WH*sizeof(uint32_t)*3);
 	}
 
 	{

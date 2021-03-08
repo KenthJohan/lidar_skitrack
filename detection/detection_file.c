@@ -41,6 +41,11 @@
 
 
 //../txtpoints/4/14_17_18_225279.txt -m1
+
+
+/*
+Bad PCA plane: -f "C:/recordings_20210302/p1.out" -v -c -m1 -F206
+*/
 int main (int argc, char const * argv[])
 {
 	csc_crossos_enable_ansi_color();
