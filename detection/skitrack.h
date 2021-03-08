@@ -61,11 +61,7 @@ struct skitrack
 };
 
 
-
-
-
-
-static void skitrack_process (struct skitrack * s)
+static void skitrack_rectify (struct skitrack * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
 
@@ -79,6 +75,7 @@ static void skitrack_process (struct skitrack * s)
 		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
 	}
 
+
 	/*
 	//Clamp points:
 	for (uint32_t i = 0; i < LIDAR_WH; ++i)
@@ -86,6 +83,12 @@ static void skitrack_process (struct skitrack * s)
 		s->pc1[i*POINT_STRIDE+2] = CLAMP (s->pc1[i*POINT_STRIDE+2], -0.05f, 0.03f);
 	}
 	*/
+}
+
+
+static void skitrack_process (struct skitrack * s)
+{
+	ASSERT_PARAM_NOTNULL (s);
 
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are located:
@@ -219,14 +222,6 @@ static void skitrack_process (struct skitrack * s)
 
 
 
-	//Experiment of subset point to make a local PCA plane:
-	{
-		int32_t o = s->peak[0];//Skitrack position
-		int32_t w = 12;
-		int32_t a = MAX (o-w, 0);
-		int32_t b = MIN (o+w, IMG_YN);
-		s->pc2_count = pointcloud_subset (s->img1, s->pc2, a, b);
-	}
 
 
 	//Exponential Moving Average (EMA) filter:
@@ -239,3 +234,26 @@ static void skitrack_process (struct skitrack * s)
 	*/
 
 }
+
+
+static void skitrack_subset (struct skitrack * s)
+{
+	//Experiment of subset point to make a local PCA plane:
+	{
+		int32_t o = s->peak[0];//Skitrack position
+		int32_t w = 15;
+		int32_t a = MAX (o-w, 0);
+		int32_t b = MIN (o+w, IMG_YN);
+		s->pc2_count = pointcloud_subset (s->img1, s->pc2, a, b);
+		//s->pc_count = pointcloud_subset (s->img1, s->pc1, a, b);
+	}
+
+	//Move pointcloud to the origin and rotate it:
+	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
+	{
+		//float aux[LIDAR_WH*POINT_STRIDE];
+		//pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+	}
+}
+
+

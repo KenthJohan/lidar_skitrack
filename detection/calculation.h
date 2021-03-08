@@ -301,7 +301,10 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 
 	//Copy unrectified pointcloud:
 	memcpy (points.cloud1, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	skitrack_rectify (s2);
 	skitrack_process (s2);
+	skitrack_subset (s2);
+
 	//Copy rectified pointcloud:
 	memcpy (points.cloud2, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
 	memcpy (points.cloud3, s2->pc2, LIDAR_WH*POINT_STRIDE*sizeof(float));
