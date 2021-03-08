@@ -114,7 +114,7 @@ int main (int argc, char const * argv[])
 		while (1)
 		{
 			printf ("[INFO] frame: %f\n", (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE));
-			int r = fread (s1.pc, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, f);
+			int r = fread (s1.pc, sizeof (float) * POINT_STRIDE * LIDAR_WH, 1, f);
 			ASSERTF (r == 1, "%i", r);
 			s1.pc_count = LIDAR_WH;
 			show (&s1, &s2, sock, arg_showflags);

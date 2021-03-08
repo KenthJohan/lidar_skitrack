@@ -45,14 +45,33 @@ struct skitrack2
 	float q4[IMG_YN];
 
 	//Peaks index locations:
-	float g1[SKITRACK2_PEAKS_COUNT];
-	float g2[SKITRACK2_PEAKS_COUNT];
-	float g3[SKITRACK2_PEAKS_COUNT];
+	//float g1[SKITRACK2_PEAKS_COUNT];
+	//float g2[SKITRACK2_PEAKS_COUNT];
+	//float g3[SKITRACK2_PEAKS_COUNT];
 	float go[SKITRACK2_PEAKS_COUNT];
 
 	//Skitrack direction (x, x + k*y):
 	float k;
 };
+
+
+
+//Calculate Local PCA plane:
+static uint32_t pointcloud_subset (float const img[], float pc[], uint32_t y0, uint32_t y1)
+{
+	uint32_t count = 0;
+	for (uint32_t x = 0; x < IMG_XN; ++x)
+	{
+		for (uint32_t y = y0; y < y1; ++y)
+		{
+			uint32_t index = ((uint32_t)y * IMG_XN) + (uint32_t)x;
+			float * p = pc + POINT_STRIDE * count;
+			pixel_to_point (p, IMG_XN, IMG_YN, img[index]*2.0f, x, y);
+			count++;
+		}
+	}
+	return count;
+}
 
 
 
@@ -63,6 +82,8 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are:
 	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, pc_count);
+
+
 
 	//Amplify skitrack pattern in the 2D image:
 	{
@@ -111,11 +132,11 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 		s->q2[i] = fabs(s->q1[i]);
 		s->q4[i] += fabs(s->q1[i]) * 0.15f;
 	}
-	float skitrack_kernel1d_a[] =
+
 	{
-	 1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f
-	};
-	vf32_convolution1d (s->q2, IMG_YN, s->q3, skitrack_kernel1d_a, countof (skitrack_kernel1d_a));
+		float k[] = {1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f};
+		vf32_convolution1d (s->q2, IMG_YN, s->q3, k, countof (k));
+	}
 
 	//Remove foot tracks
 	for (uint32_t i = 3; i < IMG_YN-3; ++i)
@@ -125,7 +146,6 @@ static void skitrack2_process (struct skitrack2 * s, float pc[], uint32_t pc_cou
 		{
 			s->q3[i] = 0.0f;
 		}
-
 	}
 
 

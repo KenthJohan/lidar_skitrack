@@ -13,7 +13,7 @@
 struct skitrack1
 {
 	uint32_t pc_count;//Number of points in pointcloud
-	float pc[LIDAR_WH*POINT_STRIDE];//All points of pointcloud
+	float pc[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
 	float pc1[LIDAR_WH*POINT_STRIDE];//All points of pointcloud
 	float w[3];//Eigen values
 	float c[3*3];//Covariance matrix first then 3x eigen vectors

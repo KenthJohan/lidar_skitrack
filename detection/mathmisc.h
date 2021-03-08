@@ -82,6 +82,7 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
 	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', 3, c, 3, w);
 	//Prevent pointcloud flipping:
+	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
 	if (c[7] < 0.0f)
 	{
 		//Flip Y vector of pointcloud
@@ -89,9 +90,9 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 		c[4] *= -1.0f;
 		c[5] *= -1.0f;
 		//Flip Z vector of pointcloud
-		c[6] *= -1.0f;
-		c[7] *= -1.0f;
-		c[8] *= -1.0f;
+		c[6] *= -1.0f;//x
+		c[7] *= -1.0f;//y
+		c[8] *= -1.0f;//z
 	}
 	//Rectify every point by this rotation matrix which is the current orientation of the points:
 	r[0] = c[3];// x <=> y
@@ -109,7 +110,45 @@ static void pointcloud_pca (float x[], float x1[], uint32_t *nx, uint32_t ldx, f
 }
 
 
-
+static void pointcloud_pca1 (float x[], float x1[], uint32_t *nx, uint32_t ldx, float centroid[3], float w[3], float c[3*3], float r[3*3])
+{
+	uint32_t n = (*nx);
+	//Move the center of all points to origin:
+	vf32_move_center_to_zero (3, x, ldx, x1, ldx, n, centroid);
+	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
+	//matrix(c) := scalar(alpha) * matrix(pc1) * matrix(pc1)^T
+	float alpha = 1.0f / ((float)n - 1.0f);
+	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, 3, 3, n, alpha, x1, ldx, x1, ldx, 0.0f, c, 3);
+	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
+	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
+	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', 3, c, 3, w);
+	//Prevent pointcloud flipping:
+	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
+	if (c[7] < 0.0f)
+	{
+		//Flip Y vector of pointcloud
+		c[3] *= -1.0f;
+		c[4] *= -1.0f;
+		c[5] *= -1.0f;
+		//Flip Z vector of pointcloud
+		c[6] *= -1.0f;//x
+		c[7] *= -1.0f;//y
+		c[8] *= -1.0f;//z
+	}
+	//Rectify every point by this rotation matrix which is the current orientation of the points:
+	r[0] = c[3];// x <=> y
+	r[1] = c[6];// y <=> z
+	r[2] = c[0];// z <=> x
+	r[3] = c[4];
+	r[4] = c[7];
+	r[5] = c[1];
+	r[6] = c[5];
+	r[7] = c[8];
+	r[8] = c[2];
+	//matrix(pc) := matrix(r) * matrix(pc1)
+	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, 3, n, 3, 1.0f, r, 3, x1, ldx, 0.0f, x, ldx);
+	(*nx) = n;
+}
 
 
 
@@ -273,13 +312,11 @@ void point_to_pixel (float const p[4], uint32_t xn, uint32_t yn, float * pixel, 
 
 void pixel_to_point (float p[4], uint32_t xn, uint32_t yn, float pixel, float x, float y)
 {
-	float const sx = 20.0f;
-	float const sy = 20.0f;
 	//x = p*sx + xn/2
 	//x - xn/2 = p*sx
 	//(x - xn/2)/sx = p
-	p[0] = (x - xn/2) / sx;
-	p[1] = (y - yn/2) / sy;
+	p[0] = (x - xn/2) * IMG_SCALE;
+	p[1] = (y - yn/2) * IMG_SCALE;
 	p[2] = pixel;
 }
 
