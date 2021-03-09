@@ -56,6 +56,12 @@ static void pointcloud_filter (float dst[], uint32_t dst_stride, float const src
 }
 
 
+static void flipper()
+{
+
+}
+
+
 /**
  * @brief
  * @param[in,out] x             Pointcloud
@@ -93,7 +99,27 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 		c[7] *= -1.0f;//y
 		c[8] *= -1.0f;//z
 	}
-	//Rectify every point by this rotation matrix which is the current orientation of the points:
+
+
+	//Assemble a rotation matrix from eigen vectors which are used to rotate pointcloud:
+	//After rotation the pointcloud should be aligned to standard basis:
+	//Eigen column vectors in (c) are sorted by eigen values, shortest vector first:
+	r[0] = c[3];//Medium length PCA basis to x standard basis
+	r[1] = c[4];//Medium length PCA basis to x standard basis
+	r[2] = c[5];//Medium length PCA basis to x standard basis
+	r[3] = c[6];//Farthest length PCA basis to y standard basis
+	r[4] = c[7];//Farthest length PCA basis to y standard basis
+	r[5] = c[8];//Farthest length PCA basis to y standard basis
+	r[6] = c[0];//Shortest length PCA basis to z standard basis
+	r[7] = c[1];//Shortess length PCA basis to z standard basis
+	r[8] = c[2];//Shortset length PCA basis to z standard basis
+	//x : (3 * n) matrix
+	//r : (3 * 3) matrix
+	//x := r^T * x + 0*x
+	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
+
+
+	/*
 	r[0] = c[3];// x <=> y
 	r[1] = c[6];// y <=> z
 	r[2] = c[0];// z <=> x
@@ -103,8 +129,11 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 	r[6] = c[5];
 	r[7] = c[8];
 	r[8] = c[2];
-	//matrix(pc) := matrix(r) * matrix(pc1)
+	//x : (3 * n) matrix
+	//r : (3 * 3) matrix
+	//x := r^T * x + 0*x
 	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
+	*/
 }
 
 
