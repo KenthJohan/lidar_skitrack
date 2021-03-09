@@ -15,21 +15,7 @@
 
 ## Algorithm
 
-### Detection
-1. Move pointcloud to origin and . <br>
-Following can be used: PCA, RPCA, RANSAC
-
-2. Project whole set of 3D LiDAR points to plane which outputs a 2D image.<br>
-Projection : ((3x3 matrix), (3D points)) -> (2D image)
-
-3. Do a 2D skitrack convolotion `--v--v--` over that 2D image: (kernel, (2D image)) -> (2D image)
-4. Find the most common direction in that 2D image: (2D image) -> (direction)
-5. Project all pixels from 2D image in that direction to a 1D image: ((2D image), (direction)) -> (1d image)
-6. Do a 1D skitrack convolotion `--v--v--` over that 1D image: (kernel, (1D image)) -> (1D image)
-
-### Tracking
-1. (Not implemented) Low pass filter: (1D image) -> (1D image)
-2. Find all local peaks: (1D image) -> (set of peaks locations)
+![skitrackalg](skitrackalg.png)
 
 
 ## The visualizer
