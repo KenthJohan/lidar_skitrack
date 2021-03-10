@@ -12,37 +12,40 @@
 #define ARG_VERBOSE          UINT32_C(0x00000002)
 #define ARG_STDIN            UINT32_C(0x00000010)
 
-static void on_connect(struct mosquitto *mosq, void *obj, int reason_code)
+static void on_connect (struct mosquitto *mosq, void *obj, int reason_code)
 {
-	printf("on_connect: %s\n", mosquitto_connack_string(reason_code));
-	if(reason_code != 0)
+	UNUSED (obj);
+	printf("on_connect: %s\n", mosquitto_connack_string (reason_code));
+	if (reason_code != 0)
 	{
-		mosquitto_disconnect(mosq);
+		mosquitto_disconnect (mosq);
 	}
 }
 
-static void on_publish(struct mosquitto *mosq, void *obj, int mid)
+static void on_publish (struct mosquitto *mosq, void *obj, int mid)
 {
-	printf("Message with mid %d has been published.\n", mid);
+	UNUSED (mosq);
+	UNUSED (obj);
+	//printf ("Message with mid %d has been published.\n", mid);
 }
 
 
-static void publish_float (struct mosquitto *mosq, char const * topic, float number)
+static void publish_float (struct mosquitto *mosq, int qos, char const * topic, float number)
 {
 	char payload[20];
-	int rc;
-	snprintf(payload, sizeof(payload), "%f", number);
-	rc = mosquitto_publish (mosq, NULL, "example/temperature", strlen(payload), payload, 2, 0);
-	if(rc != MOSQ_ERR_SUCCESS)
+	snprintf (payload, sizeof(payload), "%f", number);
+	printf ("Msg %s: %s\n", topic, payload);
+	int rc = mosquitto_publish (mosq, NULL, topic, strlen (payload), payload, qos, 0);
+	if (rc != MOSQ_ERR_SUCCESS)
 	{
-		fprintf(stderr, "Error publishing: %s\n", mosquitto_strerror(rc));
+		fprintf (stderr, "Error publishing: %s\n", mosquitto_strerror (rc));
 	}
 }
-
 
 
 int main (int argc, char const * argv[])
 {
+	UNUSED (argc);
 	csc_crossos_enable_ansi_color();
 
 	{
@@ -55,20 +58,21 @@ int main (int argc, char const * argv[])
 	char const * arg_mqtt_address = "test.mosquitto.org";
 	uint32_t arg_mqtt_port = 1883;
 	uint32_t arg_mqtt_keepalive = 60;
+	uint32_t arg_mqtt_qos = 2;
 	FILE * lidarfile = NULL;
 	struct csc_argv_option option[] =
 	{
-	CSC_ARGV_DEFINE_GROUP("General:"),
-	{'h', "help",            CSC_TYPE_U32,    &arg_flags,          ARG_HELP,            "Show help"},
-	{'v', "verbose",         CSC_TYPE_U32,    &arg_flags,          ARG_VERBOSE,         "Show verbose"},
-	{'i', "stdin",           CSC_TYPE_U32,    &arg_flags,          ARG_STDIN,           "Read pointcloud from stdin"},
-	{'f', "filename",        CSC_TYPE_STRING, &arg_filename,       0,                   "Read pointcloud from a file"},
-	CSC_ARGV_DEFINE_GROUP("MQTT:"),
-	{'a', "address",         CSC_TYPE_STRING, &arg_mqtt_address,   0,                   "MQTT address"},
-	{'p', "port",            CSC_TYPE_U32,    &arg_mqtt_port,      0,                   "MQTT port"},
-	{'k', "keepalive",       CSC_TYPE_U32,    &arg_mqtt_keepalive, 0,                   "MQTT keepalive"},
-	CSC_ARGV_END};
-
+	{CSC_ARGV_DEFINE_GROUP("General:")},
+	{'h', "help",       CSC_TYPE_U32,    &arg_flags,          ARG_HELP,    "Show help"},
+	{'v', "verbose",    CSC_TYPE_U32,    &arg_flags,          ARG_VERBOSE, "Show verbose"},
+	{'i', "stdin",      CSC_TYPE_U32,    &arg_flags,          ARG_STDIN,   "Read pointcloud from stdin"},
+	{'f', "filename",   CSC_TYPE_STRING, &arg_filename,       0,           "Read pointcloud from a file"},
+	{CSC_ARGV_DEFINE_GROUP("MQTT:")},
+	{'a', "address",    CSC_TYPE_STRING, &arg_mqtt_address,   0,           "MQTT address"},
+	{'p', "port",       CSC_TYPE_U32,    &arg_mqtt_port,      0,           "MQTT port"},
+	{'k', "keepalive",  CSC_TYPE_U32,    &arg_mqtt_keepalive, 0,           "MQTT keepalive"},
+	{'q', "qos",        CSC_TYPE_U32,    &arg_mqtt_qos,       0,           "MQTT integer value 0, 1 or 2 indicating the Quality of Service to be used for the message."},
+	{CSC_ARGV_END}};
 	csc_argv_parseall (argv+1, option);
 
 	if (arg_flags & ARG_HELP)
@@ -90,24 +94,26 @@ int main (int argc, char const * argv[])
 	mosquitto_connect_callback_set (mosq, on_connect);
 	mosquitto_publish_callback_set (mosq, on_publish);
 
-{
-	int rc = mosquitto_connect (mosq, arg_mqtt_address, arg_mqtt_port, arg_mqtt_keepalive);
-	if(rc != MOSQ_ERR_SUCCESS)
+
+	if (mosq != NULL)
 	{
-		mosquitto_destroy(mosq);
-		fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
-		return 1;
-	}
+		int rc = mosquitto_connect (mosq, arg_mqtt_address, arg_mqtt_port, arg_mqtt_keepalive);
+		if (rc != MOSQ_ERR_SUCCESS)
+		{
+			mosquitto_destroy (mosq);
+			fprintf (stderr, "Error: %s\n", mosquitto_strerror(rc));
+			return 1;
+		}
 	}
 
-{
-	int rc = mosquitto_loop_start(mosq);
-	if (rc != MOSQ_ERR_SUCCESS)
 	{
-		mosquitto_destroy(mosq);
-		fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
+		int rc = mosquitto_loop_start(mosq);
+		if (rc != MOSQ_ERR_SUCCESS)
+		{
+			mosquitto_destroy (mosq);
+			fprintf (stderr, "Error: %s\n", mosquitto_strerror (rc));
 			return 1;
-	}
+		}
 	}
 
 
@@ -119,7 +125,8 @@ int main (int argc, char const * argv[])
 	else if (arg_filename)
 	{
 		printf ("[INFO] Opening file %s to read LiDAR frames continuously.\n", arg_filename);
-		lidarfile = stdin;
+		lidarfile = fopen (arg_filename, "rb");
+		ASSERT_NOTNULL (lidarfile);
 	}
 
 	if (lidarfile)
@@ -133,12 +140,13 @@ int main (int argc, char const * argv[])
 			skitrack_rectify (&ski);
 			skitrack_process (&ski);
 
+			//Send skitrack info to MQTT
 			float offset = (ski.peak[0] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
 			float angle = atanf (ski.k);
 			float speed = 1.0f;
-			publish_float (mosq, "/commands/c2h/offset", offset);
-			publish_float (mosq, "/commands/c2h/angle", angle);
-			publish_float (mosq, "/commands/c2h/speed", speed);
+			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/offset", offset);
+			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/angle", angle);
+			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/speed", speed);
 		}
 	}
 

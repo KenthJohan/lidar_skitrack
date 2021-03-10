@@ -68,7 +68,7 @@ int main (int argc, char const * argv[])
 	{'F', "frame",           CSC_TYPE_U32,    &arg_frame,      0,                   "The starting frame"},
 	{'c', "ctrlmode",        CSC_TYPE_U32,    &arg_flags,      ARG_CTRLMODE,        "Step forward foreach keypress"},
 	{'d', "duration",        CSC_TYPE_U32,    &arg_usleep,     0,                   "Duration for each frame"},
-	CSC_ARGV_END};
+	{CSC_ARGV_END}};
 
 	csc_argv_parseall (argv+1, option);
 
