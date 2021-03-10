@@ -144,9 +144,9 @@ int main (int argc, char const * argv[])
 			float offset = (ski.peak[0] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
 			float angle = atanf (ski.k);
 			float speed = 1.0f;
-			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/offset", offset);
-			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/angle", angle);
-			publish_float (mosq, arg_mqtt_qos, "/commands/c2h/speed", speed);
+			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/offset", offset);
+			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/angle", angle);
+			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/speed", speed);
 		}
 	}
 
