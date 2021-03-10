@@ -128,14 +128,19 @@ int main (int argc, char const * argv[])
 		lidarfile = fopen (arg_filename, "rb");
 		ASSERT_NOTNULL (lidarfile);
 	}
-
+	uint32_t framenr = 0;
 	if (lidarfile)
 	{
 		struct skitrack ski = {0};
 		while (1)
 		{
+			if (arg_flags & ARG_VERBOSE)
+			{
+				printf ("Framenr %i\n", framenr);
+			}
 			int r = fread (ski.pc1, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, lidarfile);
-			ASSERTF (r == 1, "%i", r);
+			ASSERTF (r == 1, "fread %i", r);
+			framenr ++;
 			ski.pc_count = LIDAR_WH;
 			skitrack_rectify (&ski);
 			skitrack_process (&ski);
