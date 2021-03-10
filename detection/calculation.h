@@ -84,15 +84,15 @@ static void draw_img2 (nng_socket sock, struct skitrack * s1, uint32_t flags)
 	float m[4*4] = {0.0f};
 	//m4f32_identity (m);
 	m4f32_translation (m, s1->centroid);
-	m[M4_02] = s1->c[0];//Column 2
-	m[M4_12] = s1->c[1];//Column 2
-	m[M4_22] = s1->c[2];//Column 2
-	m[M4_00] = s1->c[3];//Column 0
-	m[M4_10] = s1->c[4];//Column 0
-	m[M4_20] = s1->c[5];//Column 0
-	m[M4_01] = s1->c[6];//Column 1
-	m[M4_11] = s1->c[7];//Column 1
-	m[M4_21] = s1->c[8];//Column 1
+	m[M4_02] = s1->e[0];//Column 2
+	m[M4_12] = s1->e[1];//Column 2
+	m[M4_22] = s1->e[2];//Column 2
+	m[M4_00] = s1->e[3];//Column 0
+	m[M4_10] = s1->e[4];//Column 0
+	m[M4_20] = s1->e[5];//Column 0
+	m[M4_01] = s1->e[6];//Column 1
+	m[M4_11] = s1->e[7];//Column 1
+	m[M4_21] = s1->e[8];//Column 1
 	m[M4_33] = 1.0f;
 	if (flags & VISUAL_MODE_VERBOOSE1)
 	{
@@ -173,11 +173,11 @@ static void draw_pca (nng_socket sock, struct skitrack * s1)
 	struct v4f32_line pos[3];
 	struct u32_line col[3];
 	vf32_set3 (pos[0].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (pos[0].b, s1->c[0], s1->c[1], s1->c[2]);
+	vf32_set3 (pos[0].b, s1->e[0], s1->e[1], s1->e[2]);
 	vf32_set3 (pos[1].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (pos[1].b, s1->c[3], s1->c[4], s1->c[5]);
+	vf32_set3 (pos[1].b, s1->e[3], s1->e[4], s1->e[5]);
 	vf32_set3 (pos[2].a, 0.0f   , 0.0f   , 0.0f   );
-	vf32_set3 (pos[2].b, s1->c[6], s1->c[7], s1->c[8]);
+	vf32_set3 (pos[2].b, s1->e[6], s1->e[7], s1->e[8]);
 	vsf32_mul (4, pos[0].b, pos[0].b, sqrt(s1->w[0])*2.0f);
 	vsf32_mul (4, pos[1].b, pos[1].b, sqrt(s1->w[1])*2.0f);
 	vsf32_mul (4, pos[2].b, pos[2].b, sqrt(s1->w[2])*2.0f);
@@ -301,9 +301,10 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 
 	//Copy unrectified pointcloud:
 	memcpy (points.cloud1, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	skitrack_firstpass (s2);
 	skitrack_rectify (s2);
 	skitrack_process (s2);
-	skitrack_subset (s2);
+	//skitrack_subset (s2);
 
 	//Copy rectified pointcloud:
 	memcpy (points.cloud2, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
@@ -349,7 +350,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 		printf ("[INFO] Centroid: %f %f %f\n", s2->centroid[0], s2->centroid[1], s2->centroid[2]);
 		printf ("[INFO] Eigen values: %f %f %f\n", s2->w[0], s2->w[1], s2->w[2]);
 		printf ("[INFO] Eigen column vectors:\n");
-		m3f32_print (s2->c, stdout);
+		m3f32_print (s2->e, stdout);
 	}
 
 	draw_skitrack (sock, s2, imgv, flags);

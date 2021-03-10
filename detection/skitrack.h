@@ -37,7 +37,9 @@ struct skitrack
 	uint32_t pc2_count;//Number of points in pointcloud
 	float pc2[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
 	float w[3];//Eigen values
-	float c[3*3];//Covariance matrix first then 3x eigen vectors
+	float covk;
+	float c[3*3];//Covariance matrix
+	float e[3*3];//3x eigen vectors
 	float r[3*3];//Rotation matrix
 	float centroid[3];//Center point of pointcloud
 
@@ -61,21 +63,48 @@ struct skitrack
 };
 
 
+static void skitrack_firstpass (struct skitrack * s)
+{
+	float aux[LIDAR_WH*POINT_STRIDE];
+	float pc[LIDAR_WH*POINT_STRIDE];
+	float c[3*3];//Covariance matrix
+	float e[3*3];//3x eigen vectors
+	float r[3*3];//Rotation matrix
+	float w[3];//Eigen values
+	float centroid[3];//Center point of pointcloud
+	memcpy (pc, s->pc1, sizeof (pc));
+	pointcloud_pca (pc, aux, s->pc_count, POINT_STRIDE, centroid, w, c, e, r, 1.0);
+	uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, s->pc_count);
+	float avg = vf32_avg (IMG_XN * IMG_YN, s->img1);
+	vsf32_sub (IMG_XN * IMG_YN, s->img1, s->img1, avg);
+	float deviation = vf32_norm2 (IMG_XN * IMG_YN, s->img1) / count;
+	printf ("firstpass %6i, %f\n", count, deviation);
+	if ((count < 6000))
+	{
+		s->covk = 0.001;
+	}
+	else
+	{
+		s->covk = 1.0;
+	}
+}
+
+
+
 static void skitrack_rectify (struct skitrack * s)
 {
 	ASSERT_PARAM_NOTNULL (s);
 
 	//Remove bad points:
 	pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, &s->pc_count, POINT_DIM, 1.0f);
+	//s->pc_count = pointcloud_filter1 (s->pc1, 1.0f, 0, LIDAR_W-1);
 
 	//Move pointcloud to the origin and rotate it:
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
 	{
 		float aux[LIDAR_WH*POINT_STRIDE];
-		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
+		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->e, s->r, s->covk);
 	}
-
-
 	/*
 	//Clamp points:
 	for (uint32_t i = 0; i < LIDAR_WH; ++i)
@@ -92,8 +121,10 @@ static void skitrack_process (struct skitrack * s)
 
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are located:
-	point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, POINT_STRIDE, s->pc_count);
-
+	{
+		uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, POINT_STRIDE, s->pc_count);
+		printf ("point_project %i\n", count);
+	}
 
 
 	//Amplify skitrack patterns in the 2D image:

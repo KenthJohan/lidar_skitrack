@@ -91,6 +91,8 @@ int main (int argc, char const * argv[])
 
 
 	struct skitrack ski = {0};
+	ski.covk = 1.0f;
+
 	if (arg_flags & ARG_STDIN)
 	{
 		printf ("[INFO] Opening stdin to read LiDAR frames continuously.\n");

@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include "csc/csc_math.h"
+#include "csc/csc_v4f32.h"
 #include "../shared/shared.h"
 
 
@@ -56,6 +57,29 @@ static void pointcloud_filter (float dst[], uint32_t dst_stride, float const src
 }
 
 
+static uint32_t pointcloud_filter1 (v4f32 p[], float k2, uint32_t x0, uint32_t x1)
+{
+	ASSERT_PARAM_NOTNULL (p);
+	ASSERT (x0 >= 0);
+	ASSERT (x1 < LIDAR_W);
+	uint32_t j = 0;
+	for (uint32_t x = x0; x <= x1; ++x)
+	{
+		for (uint32_t y = 0; y < LIDAR_H; ++y)
+		{
+			uint32_t i = LIDAR_INDEX(x,y);
+			float l2 = v4f32_norm2 (p[i]);
+			if (l2 < k2) {continue;}
+			v4f32_cpy (p[j], p[i]);
+			j ++;
+		}
+	}
+	return j;
+}
+
+
+
+
 static void flipper()
 {
 
@@ -73,7 +97,7 @@ static void flipper()
  * @param[out]    c             m3f32 Eigen vectors
  * @param[out]    r             m3f32 Rotation matrix
  */
-static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, float centroid[3], float w[3], float c[3*3], float r[3*3])
+static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, float centroid[3], float w[3], float c[3*3], float e[3*3], float r[3*3], float k)
 {
 	//Number of dimensions:
 	uint32_t dim = 3;
@@ -82,37 +106,38 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
 	//matrix(c) := scalar(alpha) * matrix(pc1) * matrix(pc1)^T
 	float alpha = 1.0f / ((float)n - 1.0f);
-	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha, x1, ldx, x1, ldx, 0.0f, c, dim);
+	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha*k, x1, ldx, x1, ldx, (1.0f - k), c, dim);
 	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
-	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', dim, c, dim, w);
+	memcpy (e, c, sizeof (float)*3*3);
+	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', dim, e, dim, w);
 	//Prevent pointcloud flipping:
 	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
-	if (c[7] < 0.0f)
+	if (e[7] < 0.0f)
 	{
 		//Flip Y vector of pointcloud
-		c[3] *= -1.0f;
-		c[4] *= -1.0f;
-		c[5] *= -1.0f;
+		e[3] *= -1.0f;
+		e[4] *= -1.0f;
+		e[5] *= -1.0f;
 		//Flip Z vector of pointcloud
-		c[6] *= -1.0f;//x
-		c[7] *= -1.0f;//y
-		c[8] *= -1.0f;//z
+		e[6] *= -1.0f;//x
+		e[7] *= -1.0f;//y
+		e[8] *= -1.0f;//z
 	}
 
 
 	//Assemble a rotation matrix from eigen vectors which are used to rotate pointcloud:
 	//After rotation the pointcloud should be aligned to standard basis:
 	//Eigen column vectors in (c) are sorted by eigen values, shortest vector first:
-	r[0] = c[3];//Medium length PCA basis to x standard basis
-	r[1] = c[4];//Medium length PCA basis to x standard basis
-	r[2] = c[5];//Medium length PCA basis to x standard basis
-	r[3] = c[6];//Farthest length PCA basis to y standard basis
-	r[4] = c[7];//Farthest length PCA basis to y standard basis
-	r[5] = c[8];//Farthest length PCA basis to y standard basis
-	r[6] = c[0];//Shortest length PCA basis to z standard basis
-	r[7] = c[1];//Shortess length PCA basis to z standard basis
-	r[8] = c[2];//Shortset length PCA basis to z standard basis
+	r[0] = e[3];//Medium length PCA basis to x standard basis
+	r[1] = e[4];//Medium length PCA basis to x standard basis
+	r[2] = e[5];//Medium length PCA basis to x standard basis
+	r[3] = e[6];//Farthest length PCA basis to y standard basis
+	r[4] = e[7];//Farthest length PCA basis to y standard basis
+	r[5] = e[8];//Farthest length PCA basis to y standard basis
+	r[6] = e[0];//Shortest length PCA basis to z standard basis
+	r[7] = e[1];//Shortess length PCA basis to z standard basis
+	r[8] = e[2];//Shortset length PCA basis to z standard basis
 	//x : (3 * n) matrix
 	//r : (3 * 3) matrix
 	//x := r^T * x + 0*x
@@ -308,10 +333,11 @@ void pixel_to_point (float p[4], uint32_t xn, uint32_t yn, float pixel, float x,
 
 
 
-void point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], uint32_t v_stride, uint32_t x_count)
+uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], uint32_t v_stride, uint32_t x_count)
 {
 	memset (pix, 0, sizeof(float) * xn * yn);
 	memset (imgf, 0, sizeof(float) * xn * yn);
+	uint32_t count = 0;
 	for (uint32_t i = 0; i < x_count; ++i, v += v_stride)
 	{
 		//v[2] += 1.0f;
@@ -333,6 +359,7 @@ void point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v
 		//If multiple points land on one pixel then it will be accumalted but it will also be normalized later on:
 		pix[index] += z;
 		imgf[index] += 1.0f;
+		count++;
 		//pix[index] = 0.5f*pix[index] + 0.5f*z;
 	}
 
@@ -352,6 +379,7 @@ void point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v
 		//This statement test scenories where average pointcloud z-position is far of origin:
 		//pix[i] += 10.0f;
 	}
+	return count;
 }
 
 
@@ -519,5 +547,10 @@ static uint32_t pointcloud_subset (float const img[], float pc[], uint32_t y0, u
 	}
 	return count;
 }
+
+
+
+
+
 
 
