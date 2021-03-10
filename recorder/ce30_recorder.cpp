@@ -19,6 +19,7 @@ using namespace ce30_driver;
 
 int main (int argc, char const * argv[])
 {
+	UNUSED (argc);
 	char const * arg_filename = "ce30_pointcloud.out";
 	char const * arg_logfile = "ce30_pointcloud.log";
 	double arg_duration = 0;
@@ -33,8 +34,8 @@ int main (int argc, char const * argv[])
 	{'l', "logfile",  CSC_TYPE_STRING,    &arg_logfile,    0, "The log filename"},
 	{'h', "help",     CSC_TYPE_U32,       &arg_flags,      ARG_HELP, "Show help"},
 	{'v', "verbose",  CSC_TYPE_U32,       &arg_flags,      ARG_VERBOSE, "Show verbose"},
-	{'s', "stdout",  CSC_TYPE_U32,        &arg_flags,      ARG_STDOUT, "Outputs pointdata to stdout"},
-	CSC_ARGV_END};
+	{'s', "stdout",   CSC_TYPE_U32,        &arg_flags,      ARG_STDOUT, "Outputs pointdata to stdout"},
+	{CSC_ARGV_END}};
 
 	csc_argv_parseall (argv+1, option);
 
