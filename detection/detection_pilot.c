@@ -59,6 +59,7 @@ int main (int argc, char const * argv[])
 	uint32_t arg_mqtt_port = 1883;
 	uint32_t arg_mqtt_keepalive = 60;
 	uint32_t arg_mqtt_qos = 2;
+	uint32_t arg_udelay = 0;
 	FILE * lidarfile = NULL;
 	struct csc_argv_option option[] =
 	{
@@ -67,6 +68,7 @@ int main (int argc, char const * argv[])
 	{'v', "verbose",    CSC_TYPE_U32,    &arg_flags,          ARG_VERBOSE, "Show verbose"},
 	{'i', "stdin",      CSC_TYPE_U32,    &arg_flags,          ARG_STDIN,   "Read pointcloud from stdin"},
 	{'f', "filename",   CSC_TYPE_STRING, &arg_filename,       0,           "Read pointcloud from a file"},
+	{'D', "delay",      CSC_TYPE_U32,    &arg_udelay,         0,           "Delay in microseconds"},
 	{CSC_ARGV_DEFINE_GROUP("MQTT:")},
 	{'a', "address",    CSC_TYPE_STRING, &arg_mqtt_address,   0,           "MQTT address"},
 	{'p', "port",       CSC_TYPE_U32,    &arg_mqtt_port,      0,           "MQTT port"},
@@ -129,14 +131,26 @@ int main (int argc, char const * argv[])
 		ASSERT_NOTNULL (lidarfile);
 	}
 	uint32_t framenr = 0;
+	uint32_t framemax = 0;
 	if (lidarfile)
 	{
+		if (arg_flags & ARG_VERBOSE)
+		{
+			fseek (lidarfile, 0, SEEK_END);
+			long int nbytes = ftell (lidarfile);
+			framemax = nbytes / (sizeof (float) * LIDAR_WH * POINT_STRIDE);
+			fseek (lidarfile, 0, SEEK_SET);
+		}
 		struct skitrack ski = {0};
 		while (1)
 		{
+			if (arg_udelay > 0)
+			{
+				usleep (arg_udelay);
+			}
 			if (arg_flags & ARG_VERBOSE)
 			{
-				printf ("Framenr %i\n", framenr);
+				printf ("Framenr %i of %i\n", framenr, framemax);
 			}
 			int r = fread (ski.pc1, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, lidarfile);
 			ASSERTF (r == 1, "fread %i", r);
