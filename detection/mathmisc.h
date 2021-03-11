@@ -97,13 +97,27 @@ static void flipper()
  * @param[out]    c             m3f32 Eigen vectors
  * @param[out]    r             m3f32 Rotation matrix
  */
-static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, float centroid[3], float w[3], float c[3*3], float e[3*3], float r[3*3], float k)
+static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, float centroid[3], float centroid_k, float w[3], float c[3*3], float e[3*3], float r[3*3], float k)
 {
-	//Number of dimensions:
-	uint32_t dim = 3;
+	ASSERT (n > 0); //Divide by zero protection
+	uint32_t dim = 3; //Number of dimensions
+
 	//Move the center of all points to origin:
-	vf32_move_center_to_zero (dim, x, ldx, x1, ldx, n, centroid);
+	//vf32_move_center_to_zero (dim, x, ldx, x1, ldx, n, centroid);
+	v3f32 mean = {0.0f, 0.0f, 0.0f};
+	vf32_addv (dim, mean, 0, mean, 0, x, ldx, n);
+	vsf32_mul (dim, mean, mean, (1.0f / (float)n) * centroid_k);
+	centroid[0] *= (1.0f - centroid_k);
+	centroid[1] *= (1.0f - centroid_k);
+	centroid[2] *= (1.0f - centroid_k);
+	centroid[0] += mean[0];
+	centroid[1] += mean[1];
+	centroid[2] += mean[2];
+	vf32_subv (dim, x1, ldx, x, ldx, centroid, 0, n);
+
+
 	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
+	//https://stattrek.com/matrix-algebra/covariance-matrix.aspx
 	//matrix(c) := scalar(alpha) * matrix(pc1) * matrix(pc1)^T
 	float alpha = 1.0f / ((float)n - 1.0f);
 	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha*k, x1, ldx, x1, ldx, (1.0f - k), c, dim);
@@ -111,6 +125,8 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
 	memcpy (e, c, sizeof (float)*3*3);
 	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', dim, e, dim, w);
+
+
 	//Prevent pointcloud flipping:
 	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
 	if (e[7] < 0.0f)
@@ -142,23 +158,6 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 	//r : (3 * 3) matrix
 	//x := r^T * x + 0*x
 	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
-
-
-	/*
-	r[0] = c[3];// x <=> y
-	r[1] = c[6];// y <=> z
-	r[2] = c[0];// z <=> x
-	r[3] = c[4];
-	r[4] = c[7];
-	r[5] = c[1];
-	r[6] = c[5];
-	r[7] = c[8];
-	r[8] = c[2];
-	//x : (3 * n) matrix
-	//r : (3 * 3) matrix
-	//x := r^T * x + 0*x
-	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
-	*/
 }
 
 

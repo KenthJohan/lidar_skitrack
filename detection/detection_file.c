@@ -44,7 +44,8 @@
 
 
 /*
-Bad PCA plane: -f "C:/recordings_20210302/p1.out" -v -c -m1 -F206
+Frame: 206    Bad PCA plane
+Frame: 6000    Bad PCA plane
 */
 int main (int argc, char const * argv[])
 {
@@ -92,6 +93,7 @@ int main (int argc, char const * argv[])
 
 	struct skitrack ski = {0};
 	ski.covk = 1.0f;
+	ski.centroid_k = 1.0f;
 
 	if (arg_flags & ARG_STDIN)
 	{

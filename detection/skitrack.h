@@ -41,6 +41,8 @@ struct skitrack
 	float c[3*3];//Covariance matrix
 	float e[3*3];//3x eigen vectors
 	float r[3*3];//Rotation matrix
+
+	float centroid_k;
 	float centroid[3];//Center point of pointcloud
 
 	//2D images:
@@ -65,27 +67,29 @@ struct skitrack
 
 static void skitrack_firstpass (struct skitrack * s)
 {
-	float aux[LIDAR_WH*POINT_STRIDE];
-	float pc[LIDAR_WH*POINT_STRIDE];
-	float c[3*3];//Covariance matrix
-	float e[3*3];//3x eigen vectors
-	float r[3*3];//Rotation matrix
-	float w[3];//Eigen values
-	float centroid[3];//Center point of pointcloud
+	float aux[LIDAR_WH*POINT_STRIDE] = {0.0f};
+	float pc[LIDAR_WH*POINT_STRIDE] = {0.0f};
+	float c[3*3] = {0.0f};//Covariance matrix
+	float e[3*3] = {0.0f};//3x eigen vectors
+	float r[3*3] = {0.0f};//Rotation matrix
+	float w[3] = {0.0f};//Eigen values
+	float centroid[3] = {0.0f};//Center point of pointcloud
 	memcpy (pc, s->pc1, sizeof (pc));
-	pointcloud_pca (pc, aux, s->pc_count, POINT_STRIDE, centroid, w, c, e, r, 1.0);
+	pointcloud_pca (pc, aux, s->pc_count, POINT_STRIDE, centroid, 1.0f, w, c, e, r, 1.0);
 	uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, s->pc_count);
 	float avg = vf32_avg (IMG_XN * IMG_YN, s->img1);
 	vsf32_sub (IMG_XN * IMG_YN, s->img1, s->img1, avg);
 	float deviation = vf32_norm2 (IMG_XN * IMG_YN, s->img1) / count;
 	printf ("firstpass %6i, %f\n", count, deviation);
-	if ((count < 6000))
+	if ((count < 5000))
 	{
-		s->covk = 0.001;
+		s->covk = 0.001f;
+		s->centroid_k = 0.001f;
 	}
 	else
 	{
-		s->covk = 1.0;
+		s->covk = 0.1f;
+		s->centroid_k = 0.1f;
 	}
 }
 
@@ -103,7 +107,7 @@ static void skitrack_rectify (struct skitrack * s)
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
 	{
 		float aux[LIDAR_WH*POINT_STRIDE];
-		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->e, s->r, s->covk);
+		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->centroid_k, s->w, s->c, s->e, s->r, s->covk);
 	}
 	/*
 	//Clamp points:
