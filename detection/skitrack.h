@@ -62,6 +62,8 @@ struct skitrack
 
 	//Skitrack direction (x, x + k*y):
 	float k;
+
+	float confidence;
 };
 
 
@@ -74,20 +76,26 @@ static void skitrack_firstpass (struct skitrack * s)
 	float r[3*3] = {0.0f};//Rotation matrix
 	float w[3] = {0.0f};//Eigen values
 	float centroid[3] = {0.0f};//Center point of pointcloud
+	uint32_t pc_count = LIDAR_WH;
 	memcpy (pc, s->pc1, sizeof (pc));
-	pointcloud_pca (pc, aux, s->pc_count, POINT_STRIDE, centroid, 1.0f, w, c, e, r, 1.0);
-	uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, s->pc_count);
-	float avg = vf32_avg (IMG_XN * IMG_YN, s->img1);
-	vsf32_sub (IMG_XN * IMG_YN, s->img1, s->img1, avg);
-	float deviation = vf32_norm2 (IMG_XN * IMG_YN, s->img1) / count;
-	printf ("firstpass %6i, %f\n", count, deviation);
+	pointcloud_filter (pc, POINT_STRIDE, pc, POINT_STRIDE, &pc_count, POINT_DIM, 1.0f);
+	pointcloud_pca (pc, aux, pc_count, POINT_STRIDE, centroid, 1.0f, w, c, e, r, 1.0);
+	uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, pc, POINT_STRIDE, pc_count);
+	//float avg = vf32_avg (IMG_XN * IMG_YN, s->img1);
+	//vsf32_sub (IMG_XN * IMG_YN, s->img1, s->img1, avg);
+	//float deviation = vf32_norm2 (IMG_XN * IMG_YN, s->img1) / count;
+	printf ("firstpass %6i of %i\n", count, pc_count);
+	//1: Number of point on the plane:
+	//2: Pointcloud thickness i.e. shortest eigen value:
 	if ((count < 5000))
 	{
+		//Use 99% of history
 		s->covk = 0.001f;
 		s->centroid_k = 0.001f;
 	}
 	else
 	{
+		//Use 90% of history
 		s->covk = 0.1f;
 		s->centroid_k = 0.1f;
 	}
@@ -101,7 +109,7 @@ static void skitrack_rectify (struct skitrack * s)
 
 	//Remove bad points:
 	pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, &s->pc_count, POINT_DIM, 1.0f);
-	//s->pc_count = pointcloud_filter1 (s->pc1, 1.0f, 0, LIDAR_W-1);
+	//s->pc_count = pointcloud_filter1 (s->pc1, 1.0f, 150, LIDAR_W-150);
 
 	//Move pointcloud to the origin and rotate it:
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
@@ -128,6 +136,16 @@ static void skitrack_process (struct skitrack * s)
 	{
 		uint32_t count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, POINT_STRIDE, s->pc_count);
 		printf ("point_project %i\n", count);
+		if (count < 5000)
+		{
+			s->confidence += -1.0f;
+		}
+		else
+		{
+			s->confidence += 1.0f;
+		}
+		s->confidence = CLAMP(s->confidence, -100.0f, 100.0f);
+		printf ("%f\n", (s->confidence + 100) / 200);
 	}
 
 

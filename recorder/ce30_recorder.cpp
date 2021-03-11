@@ -34,7 +34,7 @@ int main (int argc, char const * argv[])
 	{'l', "logfile",  CSC_TYPE_STRING,    &arg_logfile,    0, "The log filename"},
 	{'h', "help",     CSC_TYPE_U32,       &arg_flags,      ARG_HELP, "Show help"},
 	{'v', "verbose",  CSC_TYPE_U32,       &arg_flags,      ARG_VERBOSE, "Show verbose"},
-	{'s', "stdout",   CSC_TYPE_U32,        &arg_flags,      ARG_STDOUT, "Outputs pointdata to stdout"},
+	{'s', "stdout",   CSC_TYPE_U32,       &arg_flags,      ARG_STDOUT, "Outputs pointdata to stdout"},
 	{CSC_ARGV_END}};
 
 	csc_argv_parseall (argv+1, option);
