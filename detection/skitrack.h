@@ -47,6 +47,7 @@ struct skitrack
 
 	//2D images:
 	float imgf[IMG_XN*IMG_YN];//Used for normalizing pixel
+	float imgm[IMG_XN*IMG_YN];//Used for normalizing pixel
 	float img1[IMG_XN*IMG_YN];//From projected points
 	float img2[IMG_XN*IMG_YN];//Convolution from img1
 	float img3[IMG_XN*IMG_YN];//Convolution from img2
@@ -87,7 +88,7 @@ static void skitrack_firstpass (struct skitrack * s)
 	printf ("firstpass %6i of %i\n", count, pc_count);
 	//1: Number of point on the plane:
 	//2: Pointcloud thickness i.e. shortest eigen value:
-	if ((count < 5000))
+	if ((count < 6000))
 	{
 		//Use 99% of history
 		s->covk = 0.001f;
@@ -96,11 +97,10 @@ static void skitrack_firstpass (struct skitrack * s)
 	else
 	{
 		//Use 90% of history
-		s->covk = 0.1f;
-		s->centroid_k = 0.1f;
+		s->covk = 0.3f;
+		s->centroid_k = 0.3f;
 	}
 }
-
 
 
 static void skitrack_rectify (struct skitrack * s)
@@ -149,6 +149,17 @@ static void skitrack_process (struct skitrack * s)
 	}
 
 
+	{
+		int32_t kxn = 1;
+		int32_t kyn = 6;
+		for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
+		{
+			s->imgf[i] = CLAMP (s->imgf[i], 0.0f, 1.0f);
+		}
+		vf32_convolution2d_clean (s->imgm, s->imgf, IMG_XN, IMG_YN, kxn, kyn);
+	}
+
+
 	//Amplify skitrack patterns in the 2D image:
 	//https://en.wikipedia.org/wiki/Sobel_operator
 	{
@@ -165,7 +176,8 @@ static void skitrack_process (struct skitrack * s)
 		-8.0f
 		};
 		vf32_normalize (kxn*kyn, kernel, kernel);
-		vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
+		//vf32_convolution2d (s->img2, s->img1, IMG_XN, IMG_YN, kernel, kxn, kyn);
+		vf32_convolution2d_masked (s->img2, s->img1, s->imgm, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
 	//Noise must not get larger than height of skitracks:
@@ -187,6 +199,7 @@ static void skitrack_process (struct skitrack * s)
 		};
 		vf32_normalize (kxn*kyn, kernel, kernel);
 		vf32_convolution2d (s->img3, s->img2, IMG_XN, IMG_YN, kernel, kxn, kyn);
+		//vf32_convolution2d_masked (s->img3, s->img2, s->imgm, IMG_XN, IMG_YN, kernel, kxn, kyn);
 	}
 
 	//Find the most common direction in the image which hopefully is parallel to skitracks:
