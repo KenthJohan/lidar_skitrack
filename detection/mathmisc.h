@@ -19,6 +19,7 @@
 
 #include "csc/csc_math.h"
 #include "csc/csc_v4f32.h"
+#include "csc/csc_m3f32.h"
 #include "../shared/shared.h"
 
 
@@ -97,7 +98,21 @@ static void flipper()
  * @param[out]    c             m3f32 Eigen vectors
  * @param[out]    r             m3f32 Rotation matrix
  */
-static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, float centroid[3], float centroid_k, float w[3], float c[3*3], float e[3*3], float r[3*3], float k)
+static void pointcloud_pca
+(
+float x[],
+float x1[],
+uint32_t n,
+uint32_t ldx,
+float centroid[3],
+float centroid_k,
+float w[3],
+float c[3*3],
+float e[3*3],
+float r[3*3],
+float h[3*3],
+float k
+)
 {
 	ASSERT (n > 0); //Divide by zero protection
 	uint32_t dim = 3; //Number of dimensions
@@ -157,6 +172,12 @@ static void pointcloud_pca (float x[], float x1[], uint32_t n, uint32_t ldx, flo
 	//x : (3 * n) matrix
 	//r : (3 * 3) matrix
 	//x := r^T * x + 0*x
+
+	if (h)
+	{
+		m3f32_mul (r, r, h);
+	}
+
 	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
 }
 
