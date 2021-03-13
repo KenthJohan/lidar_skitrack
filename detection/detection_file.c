@@ -21,15 +21,17 @@
 #include "csc/csc_math.h"
 #include "csc/csc_linmat.h"
 #include "csc/csc_m3f32.h"
+#include "csc/csc_m3f32_print.h"
 #include "csc/csc_m4f32.h"
 #include "csc/csc_v3f32.h"
 #include "csc/csc_v4f32.h"
 #include "csc/csc_qf32.h"
 #include "csc/csc_filecopy.h"
 #include "csc/csc_argv.h"
-#include "csc/argparse.h"
+#include "csc/csc_debug.h"
 
 #include "../shared/shared.h"
+#include "../shared/log.h"
 #include "calculation.h"
 #include "mg_send.h"
 
@@ -50,7 +52,9 @@ Frame: 1500
 */
 int main (int argc, char const * argv[])
 {
+	UNUSED (argc);
 	csc_crossos_enable_ansi_color();
+	main_log_file = stdout;
 	char const * arg_filename = "../txtpoints/4/14_17_18_225279.txt";
 	char const * arg_address = "tcp://localhost:9002";
 	uint32_t arg_flags = 0;

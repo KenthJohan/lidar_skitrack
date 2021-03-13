@@ -5,10 +5,12 @@
 #include "csc/csc_m3f32.h"
 
 #include "../shared/shared.h"
+#include "../shared/log.h"
 #include "mathmisc.h"
 
-#define SKITRACK2_PEAKS_COUNT 1
 
+#define SKITRACK2_PEAKS_COUNT 1
+#define SKITRACK_STRENGHT_THRESHOLD 1.0f
 
 
 /*
@@ -60,12 +62,14 @@ struct skitrack
 	float qmem[IMG_YN];
 
 	//Peaks index locations:
+	uint32_t peak_index[SKITRACK2_PEAKS_COUNT];
 	float peak[SKITRACK2_PEAKS_COUNT];
 
 	//Skitrack direction (x, x + k*y):
 	float k;
 
 	float confidence;
+	float strength;
 
 	float anglez;
 };
@@ -227,29 +231,29 @@ static void skitrack_process (struct skitrack * s)
 	}
 
 	//Find the most common direction in the image which hopefully is parallel to skitracks:
-	s->k = vf32_most_common_line2 (s->img3, IMG_XN, IMG_YN, s->q1);
+	{
+		float q[IMG_YN] = {0.0f};
+		s->k = vf32_most_common_line2 (s->img3, IMG_XN, IMG_YN, q);
+	}
 
 	//Project 2D image to a 1D image in the the most common direction (k):
 	vf32_project_2d_to_1d (s->img3, IMG_XN, IMG_YN, s->k, s->q1);
 
 	vf32_remove_low_values (s->q1, IMG_YN);
 
-	//
+	//Absolute
 	for (uint32_t i = 0; i < IMG_YN; ++i)
 	{
 		s->q2[i] = fabs(s->q1[i]);
 	}
 
-	//Slowly change the skitrack memory for new information:
-	for (uint32_t i = 0; i < IMG_YN; ++i)
-	{
-		s->qmem[i] += fabs(s->q1[i]) * 0.15f;
-	}
 
 	//Try to create a peak where the skitrack is located:
 	{
-		float kernel[] = {1.0f,  1.0f,  2.0f, 2.0f,  2.0f,  1.0f,  1.0f};
+		float kernel[] = {1.0f,  1.0f,  1.0f, 1.0f,  1.0f,  1.0f,  1.0f};
+		vf32_normalize (countof (kernel), kernel, kernel);
 		vf32_convolution1d (s->q2, IMG_YN, s->q3, kernel, countof (kernel));
+		memcpy (s->q2, s->q3, sizeof (float) * IMG_YN);
 	}
 
 	//Apply skitrack memory:
@@ -271,55 +275,52 @@ static void skitrack_process (struct skitrack * s)
 	{
 		float q[IMG_YN] = {0.0f};
 		memcpy (q, s->q3, sizeof (q));
-		uint32_t peak_u32[SKITRACK2_PEAKS_COUNT];
-		vf32_find_peaks (q, IMG_YN, peak_u32, SKITRACK2_PEAKS_COUNT, 16, 20);
+		vf32_find_peaks (q, IMG_YN, s->peak_index, SKITRACK2_PEAKS_COUNT, 16, 20);
 		for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 		{
-			peak_u32[i] = CLAMP (peak_u32[i], 10, IMG_YN-10);
-			s->peak[i] = peak_u32[i];
-		}
-		printf ("Peakval %f\n", fabs(s->q1[peak_u32[0]]));
-		if (fabs(s->q1[peak_u32[0]]) > 0.6f)
-		{
-			float a = atan (s->k);
-			printf ("anglez: k=%f, a1=%f, a2,%f\n", s->k, s->anglez*180.0f/M_PI, a*180.0f/M_PI);
-			s->anglez += a*0.1f;
-		}
-		else
-		{
-			s->anglez *= 0.9f; //Radians
+			s->peak_index[i] = CLAMP (s->peak_index[i], 10, IMG_YN-10);
+			s->strength = s->q2[s->peak_index[i]];
+			s->peak[i] = s->peak_index[i];
 		}
 	}
 
 
 	//Memory functionality of the skitrack:
+	if (s->strength > SKITRACK_STRENGHT_THRESHOLD)
 	{
-		int32_t o = s->peak[0];//Get index location of the peak 0
-		int32_t w = 12;//Memory radius around skitrack
-		int32_t a = MAX (o-w, 0);//Start index
-		int32_t b = MIN (o+w, IMG_YN);//Stop index
-		//Decrease skitrack memory:
-		for (int32_t i = 0; i < IMG_YN; ++i)
+		{
+			int32_t o = s->peak[0];//Get index location of the peak 0
+			int32_t w = 12;//Memory radius around skitrack
+			int32_t a = MAX (o-w, 0);//Start index
+			int32_t b = MIN (o+w, IMG_YN);//Stop index
+			//Decrease skitrack memory:
+			for (int32_t i = 0; i < IMG_YN; ++i)
 		{
 			s->qmem[i] *= 0.9f;
 		}
-		//Reset memory around skitrack:
-		for (int32_t i = a; i < b; ++i)
+			//Reset memory around skitrack:
+			for (int32_t i = a; i < b; ++i)
 		{
-			//if (s->qmem[i] < 0.0f) {s->qmem[i] = 0.0f;}
 			s->qmem[i] = 1.0f;
 		}
-		//Increase skitrack memory:
-		for (int32_t i = a; i < b; ++i)
-		{
-			//if (s->qmem[i] < 0.0f) {s->qmem[i] = 0.0f;}
-			//s->qmem[i] += 0.001f;
 		}
-		//Clamp skitrack memory:
-		for (int32_t i = 0; i < IMG_YN; ++i)
+
 		{
-			//s->qmem[i] = CLAMP(s->qmem[i], -1.0f, 1.0f);
+			float a = atan (s->k);
+			printf ("anglez: k=%f, a1=%f, a2,%f\n", s->k, s->anglez*180.0f/M_PI, a*180.0f/M_PI);
+			s->anglez += a*0.1f;
 		}
+
+		//Slowly change the skitrack memory for new information:
+		for (uint32_t i = 0; i < IMG_YN; ++i)
+		{
+			s->qmem[i] += s->q2[i] * 0.15f;
+		}
+
+	}
+	else
+	{
+		s->anglez *= 0.9f; //Radians
 	}
 
 

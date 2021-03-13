@@ -61,7 +61,6 @@ static void pointcloud_filter (float dst[], uint32_t dst_stride, float const src
 static uint32_t pointcloud_filter1 (v4f32 p[], float k2, uint32_t x0, uint32_t x1)
 {
 	ASSERT_PARAM_NOTNULL (p);
-	ASSERT (x0 >= 0);
 	ASSERT (x1 < LIDAR_W);
 	uint32_t j = 0;
 	for (uint32_t x = x0; x <= x1; ++x)
@@ -189,19 +188,19 @@ float k
  * @param k[in]  Direction. P(x,y) = img2D(x, y + x*k)
  * @param q[out] The 1D image.
  */
-void vf32_project_2d_to_1d (float p[], uint32_t xn, uint32_t yn, float k, float q[])
+void vf32_project_2d_to_1d (float const p[], int32_t xn, int32_t yn, float k, float q[])
 {
-	for (uint32_t y = 0; y < yn; ++y)
+	for (int32_t y = 0; y < yn; ++y)
 	{
 		float sum = 0.0f;
-		for (uint32_t x = 0; x < xn; ++x)
+		for (int32_t x = 0; x < xn; ++x)
 		{
-			float yy = (float)y + (float)x*k;
-			if (yy < 0.0f){continue;}
-			if (yy >= (float)yn){continue;}
-			ASSERT (yy >= 0.0f);
-			ASSERT (yy < (float)yn);
-			uint32_t index = (uint32_t)yy*xn + x;
+			int32_t yy = roundf ((float)y + (float)x*k);
+			if (yy < 0){continue;}
+			if (yy >= yn){continue;}
+			ASSERT (yy >= 0);
+			ASSERT (yy < yn);
+			int32_t index = yy*xn + x;
 			ASSERT (index < xn*yn);
 			sum += p[index];
 		}
@@ -300,7 +299,7 @@ float vf32_most_common_line2 (float const p[], uint32_t xn, uint32_t yn, float q
 	float const delta = 0.1f;
 	for (float k = -1.0f; k < 1.0f; k += delta)
 	{
-		vf32_project_2d_to_1d_pn (p, xn, yn, k, q);
+		vf32_project_2d_to_1d (p, xn, yn, k, q);
 		float sum = 0.0f;
 		for (uint32_t i = 0; i < yn; ++i)
 		{

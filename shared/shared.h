@@ -37,4 +37,4 @@
 #define IMG_XN 30
 #define IMG_YN 140
 #define IMG_CN 4
-#define IMG_SCALE (1.0f/30.0f)
+#define IMG_SCALE (1.0f/25.0f)

@@ -16,11 +16,16 @@ HEADERS += mathmisc.h
 HEADERS += skitrack.h
 HEADERS += mg_comp.h
 HEADERS += mg_attr.h
+HEADERS += ../shared/shared.h
+HEADERS += ../shared/log.h
+
 HEADERS += csc/csc_math.h
-HEADERS += csc/csc_v3f32.h
 HEADERS += csc/csc_linmat.h
 HEADERS += csc/csc_m3f32.h
+HEADERS += csc/csc_m3f32_print.h
 HEADERS += csc/csc_m4f32.h
+HEADERS += csc/csc_v3f32.h
+HEADERS += csc/csc_v3f32_print.h
 HEADERS += csc/csc_qf32.h
 
 
