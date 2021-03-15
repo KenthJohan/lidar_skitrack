@@ -104,9 +104,11 @@ float x1[],
 uint32_t n,
 uint32_t ldx,
 float centroid[3],
+float centroid1[3],
 float centroid_k,
 float w[3],
 float c[3*3],
+float c1[3*3],
 float e[3*3],
 float r[3*3],
 float h[3*3],
@@ -120,21 +122,34 @@ float k
 	//vf32_move_center_to_zero (dim, x, ldx, x1, ldx, n, centroid);
 	v3f32 mean = {0.0f, 0.0f, 0.0f};
 	vf32_addv (dim, mean, 0, mean, 0, x, ldx, n);
-	vsf32_mul (dim, mean, mean, (1.0f / (float)n) * centroid_k);
-	centroid[0] *= (1.0f - centroid_k);
-	centroid[1] *= (1.0f - centroid_k);
-	centroid[2] *= (1.0f - centroid_k);
-	centroid[0] += mean[0];
-	centroid[1] += mean[1];
-	centroid[2] += mean[2];
+	vsf32_mul (dim, mean, mean, (1.0f / (float)n));
+	centroid[0] = centroid[0] * (1.0f - centroid_k) + centroid_k * mean[0];
+	centroid[1] = centroid[1] * (1.0f - centroid_k) + centroid_k * mean[1];
+	centroid[2] = centroid[2] * (1.0f - centroid_k) + centroid_k * mean[2];
+	centroid[1] = 0.0f;
 	vf32_subv (dim, x1, ldx, x, ldx, centroid, 0, n);
-
+	centroid1[0] = mean[0] - centroid[0];
+	centroid1[1] = 0.0f;
+	centroid1[2] = mean[2] - centroid[2];
 
 	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
 	//https://stattrek.com/matrix-algebra/covariance-matrix.aspx
 	//matrix(c) := scalar(alpha) * matrix(pc1) * matrix(pc1)^T
-	float alpha = 1.0f / ((float)n - 1.0f);
-	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha*k, x1, ldx, x1, ldx, (1.0f - k), c, dim);
+	{
+		ASSERT (n > 1);
+		float alpha = 1.0f / ((float)n - 1.0f);
+		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha*k, x1, ldx, x1, ldx, (1.0f - k), c, dim);
+		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha, x1, ldx, x1, ldx, 0.0f, c1, dim);
+		m3f32_sub (c1, c1, c);
+	}
+	/*
+	if (ny > 1000)
+	{
+		ASSERT (ny > 1);
+		float alpha = 1.0f / ((float)ny - 1.0f);
+		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, ny, alpha*0.9f, y, ldx, y, ldx, 0.1f, c, dim);
+	}
+	*/
 	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
 	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
 	memcpy (e, c, sizeof (float)*3*3);
@@ -174,7 +189,7 @@ float k
 
 	if (h)
 	{
-		m3f32_mul (r, r, h);
+		//m3f32_mul (r, r, h);
 	}
 
 	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
@@ -352,7 +367,7 @@ void pixel_to_point (float p[4], uint32_t xn, uint32_t yn, float pixel, float x,
 
 
 
-uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], uint32_t v_stride, uint32_t x_count)
+uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], float v2[], uint32_t v_stride, uint32_t x_count, float min_z, float max_z)
 {
 	memset (pix, 0, sizeof(float) * xn * yn);
 	memset (imgf, 0, sizeof(float) * xn * yn);
@@ -372,6 +387,8 @@ uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, flo
 		if (y >= yn){continue;}
 		if (x < 0){continue;}
 		if (y < 0){continue;}
+		if (z < min_z){continue;}
+		if (z > max_z){continue;}
 		//Convert (x,y) to index row-major:
 		uint32_t index = ((uint32_t)y * xn) + (uint32_t)x;
 		//z += 10.0f;
@@ -380,6 +397,13 @@ uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, flo
 		imgf[index] += 1.0f;
 		count++;
 		//pix[index] = 0.5f*pix[index] + 0.5f*z;
+
+
+		v2[0] = v[0];
+		v2[1] = v[1];
+		v2[2] = v[2];
+		v2[3] = v[3];
+		v2 += v_stride;
 	}
 
 	//Normalize every non zero pixel:

@@ -60,10 +60,10 @@ static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[]
 	}
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		img[s2->peak_index[i] * IMG_XN + 0] |= RGBA (0xFF, 0xFF, 0xFF, 0xFF);
-		if (s2->peak_index[i] < IMG_YN)
+		img[s2->peak_u32[i] * IMG_XN + 0] |= RGBA (0xFF, 0xFF, 0xFF, 0xFF);
+		if (s2->peak_u32[i] < IMG_YN)
 		{
-			int32_t y = s2->peak_index[i];
+			int32_t y = s2->peak_u32[i];
 			for (int32_t x = 0; x < IMG_XN/2; ++x)
 			{
 				int32_t yy = roundf((float)y + (float)x * s2->k);
@@ -135,7 +135,7 @@ static void draw_img4 (nng_socket sock, struct skitrack * s2)
 		*/
 	}
 
-	imgv[s2->peak_index[0]+IMG_YN*2] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
+	imgv[s2->peak_u32[0]+IMG_YN*2] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
 
 
 	mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE_CONTENT, imgv, IMG3_XN*IMG_YN*sizeof(uint32_t));
@@ -313,10 +313,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 
 	//Copy unrectified pointcloud:
 	memcpy (points.cloud1, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
-	//skitrack_firstpass (s2);
-	skitrack_rectify (s2);
 	skitrack_process (s2);
-	//skitrack_subset (s2);
 
 	//Copy rectified pointcloud:
 	memcpy (points.cloud2, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
@@ -333,7 +330,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	for (uint32_t i = 0; i < LIDAR_WH; ++i)
 	{
 		points.cloud3[i*POINT_STRIDE + 2] += 0.5f; //Move pointcloud up a little
-		points.cloud3[i*POINT_STRIDE + 3] = 20.0f; //Set the size of the points
+		points.cloud3[i*POINT_STRIDE + 3] = 10.0f; //Set the size of the points
 	}
 
 
@@ -367,14 +364,17 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	}
 
 
-	printf ("[INFO] Strength: %f %i\n", s2->strength, s2->peak_index[0]);
-	printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q2[s2->peak_index[0]-2],s2->q2[s2->peak_index[0]-1],s2->q2[s2->peak_index[0]],s2->q2[s2->peak_index[0]+1],s2->q2[s2->peak_index[0]+2]);
-	printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q3[s2->peak_index[0]-2],s2->q3[s2->peak_index[0]-1],s2->q3[s2->peak_index[0]],s2->q3[s2->peak_index[0]+1],s2->q3[s2->peak_index[0]+2]);
+	printf ("[INFO] PC Count: %i of %i\n", s2->pc_count, LIDAR_WH);
+	printf ("[INFO] Trackpos: %f\n", s2->trackpos[0]);
+	printf ("[INFO] Confidence: %3.0f%%\n", ((s2->confidence + 100) / 200)*100.0f);
+	printf ("[INFO] Strength: [%i] %f, Threshold=%f\n", s2->peak_u32[0], s2->strength, SKITRACK_STRENGHT_THRESHOLD);
+	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q2[s2->peak_u32[0]-2],s2->q2[s2->peak_u32[0]-1],s2->q2[s2->peak_u32[0]],s2->q2[s2->peak_u32[0]+1],s2->q2[s2->peak_u32[0]+2]);
+	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q3[s2->peak_u32[0]-2],s2->q3[s2->peak_u32[0]-1],s2->q3[s2->peak_u32[0]],s2->q3[s2->peak_u32[0]+1],s2->q3[s2->peak_u32[0]+2]);
 
 	draw_pca (sock, s2);
 	//draw_img2 (sock, s2, flags);
 	draw_img4 (sock, s2);
-	if (s2->strength > SKITRACK_STRENGHT_THRESHOLD)
+	if ((s2->strength > SKITRACK_STRENGHT_THRESHOLD) && (s2->confidence > 0.0f))
 	{
 		draw_skitrack (sock, s2, imgv, flags | VISUAL_MODE_TRACKING);
 	}
