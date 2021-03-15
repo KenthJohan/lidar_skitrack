@@ -381,6 +381,6 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	else
 	{
 		draw_skitrack (sock, s2, imgv, flags);
-		getchar();
+		//getchar();
 	}
 }
