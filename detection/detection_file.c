@@ -99,7 +99,7 @@ int main (int argc, char const * argv[])
 	struct skitrack ski = {0};
 	ski.covk = 0.0f;
 	ski.centroid_k = 0.0f;
-	ski.confidence = -100.0f;
+	ski.confidence = 0.0f;
 
 	if (arg_flags & ARG_STDIN)
 	{

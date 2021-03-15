@@ -332,11 +332,11 @@ static void skitrack_process (struct skitrack * s)
 
 		if ((s->strength < SKITRACK_STRENGHT_THRESHOLD) || (s->pc_count < (LIDAR_WH*0.5f)))
 		{
-			s->confidence -= 10.0f;
+			s->confidence -= 0.1f;
 		}
 		else
 		{
-			s->confidence += 10.0f;
+			s->confidence += 0.05f;
 		}
 	}
 
@@ -394,7 +394,7 @@ static void skitrack_process (struct skitrack * s)
 
 
 
-	s->confidence = CLAMP(s->confidence, -100.0f, 100.0f);
+	s->confidence = CLAMP(s->confidence, 0.0f, 1.0f);
 }
 
 

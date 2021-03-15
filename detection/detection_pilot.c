@@ -156,15 +156,21 @@ int main (int argc, char const * argv[])
 			ASSERTF (r == 1, "fread %i", r);
 			framenr ++;
 			ski.pc_count = LIDAR_WH;
-			skitrack_rectify (&ski);
 			skitrack_process (&ski);
 
+			printf ("[INFO] PC Count: %i of %i\n", ski.pc_count, LIDAR_WH);
+			printf ("[INFO] Trackpos: %f\n", ski.trackpos[0]);
+			printf ("[INFO] Confidence: %3.0f%%\n", ski.confidence*100.0f);
+			printf ("[INFO] Strength: [%i] %f, Threshold=%f\n", ski.peak_u32[0], ski.strength, SKITRACK_STRENGHT_THRESHOLD);
+
 			//Send skitrack info to MQTT
-			float offset = (ski.peak[0] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
-			float angle = atanf (ski.k);
-			float speed = 1.0f;
-			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/offset", offset);
-			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/angle", angle);
+			float speed = 0.0f;
+			if ((ski.confidence > 0.5f) && (ski.strength > SKITRACK_STRENGHT_THRESHOLD))
+			{
+				speed = (ski.confidence - 0.5f) * 2.0f;
+			}
+			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/offset", ski.trackpos[0]);
+			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/angle", atanf (ski.k));
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/speed", speed);
 		}
 	}

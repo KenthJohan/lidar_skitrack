@@ -366,7 +366,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 
 	printf ("[INFO] PC Count: %i of %i\n", s2->pc_count, LIDAR_WH);
 	printf ("[INFO] Trackpos: %f\n", s2->trackpos[0]);
-	printf ("[INFO] Confidence: %3.0f%%\n", ((s2->confidence + 100) / 200)*100.0f);
+	printf ("[INFO] Confidence: %3.0f%%\n", s2->confidence*100.0f);
 	printf ("[INFO] Strength: [%i] %f, Threshold=%f\n", s2->peak_u32[0], s2->strength, SKITRACK_STRENGHT_THRESHOLD);
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q2[s2->peak_u32[0]-2],s2->q2[s2->peak_u32[0]-1],s2->q2[s2->peak_u32[0]],s2->q2[s2->peak_u32[0]+1],s2->q2[s2->peak_u32[0]+2]);
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q3[s2->peak_u32[0]-2],s2->q3[s2->peak_u32[0]-1],s2->q3[s2->peak_u32[0]],s2->q3[s2->peak_u32[0]+1],s2->q3[s2->peak_u32[0]+2]);
@@ -374,7 +374,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	draw_pca (sock, s2);
 	//draw_img2 (sock, s2, flags);
 	draw_img4 (sock, s2);
-	if ((s2->strength > SKITRACK_STRENGHT_THRESHOLD) && (s2->confidence > 0.0f))
+	if ((s2->strength > SKITRACK_STRENGHT_THRESHOLD) && (s2->confidence > 0.5f))
 	{
 		draw_skitrack (sock, s2, imgv, flags | VISUAL_MODE_TRACKING);
 	}
