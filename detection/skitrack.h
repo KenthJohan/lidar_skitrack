@@ -103,6 +103,7 @@ static void skitrack_rectify (struct skitrack * s)
 
 	//Move pointcloud to the origin and rotate it:
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
+	if (s->pc_count > 10)
 	{
 		float aux[LIDAR_WH*POINT_STRIDE];
 		//s->anglez += 0.1f;
