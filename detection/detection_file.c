@@ -54,7 +54,6 @@ int main (int argc, char const * argv[])
 {
 	UNUSED (argc);
 	csc_crossos_enable_ansi_color();
-	main_log_file = stdout;
 	char const * arg_filename = "../txtpoints/4/14_17_18_225279.txt";
 	char const * arg_address = "tcp://localhost:9002";
 	uint32_t arg_flags = 0;

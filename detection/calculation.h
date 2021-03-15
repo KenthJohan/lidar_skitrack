@@ -360,7 +360,7 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 		//printf ("[INFO] Eigen values: %f %f %f\n", s2->w[0], s2->w[1], s2->w[2]);
 		//printf ("[INFO] Eigen column vectors:\n");
 		//m3f32_print (s2->e, stdout);
-		log_pca (s2->e, s2->w);
+		//log_pca (s2->e, s2->w);
 	}
 
 
