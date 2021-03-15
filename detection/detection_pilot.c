@@ -134,7 +134,7 @@ int main (int argc, char const * argv[])
 	uint32_t framemax = 0;
 	if (lidarfile)
 	{
-		if (arg_flags & ARG_VERBOSE)
+		if ((arg_flags & ARG_VERBOSE) && arg_filename)
 		{
 			fseek (lidarfile, 0, SEEK_END);
 			long int nbytes = ftell (lidarfile);
