@@ -186,12 +186,12 @@ int main (int argc, char const * argv[])
 			if (ghostime > GHOSTIME_STOP)
 			{
 				//Keeping a ghost around for a long time is considered dangerous.
-				speed = 0.0f;
+				speed = MIN (speed - 0.01f, 0.0f);
 			}
 			else if (ghostime > GHOSTIME_START)
 			{
 				//Ghostmode moves in 50% speed
-				speed = 0.5;
+				speed = MAX (speed + 0.01f, 0.5f);
 			}
 			else if (ghostime > 0)
 			{
