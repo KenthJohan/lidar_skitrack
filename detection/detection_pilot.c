@@ -164,7 +164,7 @@ int main (int argc, char const * argv[])
 			ski.pc_count = LIDAR_WH;
 			skitrack_process (&ski);
 
-			//Send skitrack info to MQTT
+
 			if ((ski.pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski.nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski.covk > 0.0f) && (ski.strength > SKITRACK_STRENGHT_THRESHOLD))
 			{
 				//Trackmode
@@ -173,25 +173,36 @@ int main (int argc, char const * argv[])
 			}
 			else if ((ski.pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski.nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski.covk > 0.0f))
 			{
-				speed = 0.0f;
+				//Ghostmode
 				ghostime++;
 			}
 			else
 			{
+				//Stopmode
 				speed = 0.0f;
 			}
 
-
-			if (ghostime > GHOSTIME_START)
+			//Wait and see if we actualy need a ghost
+			if (ghostime > GHOSTIME_STOP)
 			{
+				//Keeping a ghost around for a long time is considered dangerous.
+				speed = 0.0f;
+			}
+			else if (ghostime > GHOSTIME_START)
+			{
+				//Ghostmode moves in 50% speed
 				speed = 0.5;
 			}
-			else if (ghostime > GHOSTIME_STOP)
+			else if (ghostime > 0)
 			{
 				speed = 0.0f;
 			}
 
+
+			//Min speed is 0 and max speed is 1
 			speed = CLAMP (speed, 0.0f, 1.0f);
+
+			//Send skitrack info to MQTT
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/offset", ski.trackpos[0]);
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/angle", atanf (ski.k));
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/speed", speed);
