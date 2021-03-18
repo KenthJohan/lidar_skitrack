@@ -40,10 +40,10 @@ In 3D computer graphics, a voxel represents a value on a regular grid in three-d
  * @param[in]     dim           How many dimension in each element
  * @param[in]     k2
  */
-static void pointcloud_filter (float dst[], uint32_t dst_stride, float const src[], uint32_t src_stride, uint32_t *n, uint32_t dim, float k2)
+static uint32_t pointcloud_filter (float dst[], uint32_t dst_stride, float const src[], uint32_t src_stride, uint32_t n, uint32_t dim, float k2)
 {
 	uint32_t j = 0;
-	for (uint32_t i = 0; i < (*n); ++i)
+	for (uint32_t i = 0; i < (n); ++i)
 	{
 		float l2 = vvf32_dot (dim, src, src);
 		if (l2 > k2)
@@ -54,7 +54,7 @@ static void pointcloud_filter (float dst[], uint32_t dst_stride, float const src
 		}
 		src += src_stride;
 	}
-	(*n) = j;
+	return j;
 }
 
 
@@ -80,10 +80,104 @@ static uint32_t pointcloud_filter1 (v4f32 p[], float k2, uint32_t x0, uint32_t x
 
 
 
-static void flipper()
+//Prevent pointcloud flipping:
+static void skitrack_conditional_basis_flip (m3f32 e)
 {
-
+	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
+	if (e[7] < 0.0f)
+	{
+		//Flip Y vector of pointcloud
+		e[3] *= -1.0f;
+		e[4] *= -1.0f;
+		e[5] *= -1.0f;
+		//Flip Z vector of pointcloud
+		e[6] *= -1.0f;//x
+		e[7] *= -1.0f;//y
+		e[8] *= -1.0f;//z
+	}
 }
+
+
+//Reorders the eigen column vectors in the matrix
+static void skitrack_reorder_eigen (m3f32 e, v3f32 w)
+{
+	{
+		m3f32 r;
+		//Eigen column vectors in (c) are sorted by eigen values, shortest vector first:
+		r[0] = e[3];//Medium length PCA basis to x standard basis
+		r[1] = e[4];//Medium length PCA basis to x standard basis
+		r[2] = e[5];//Medium length PCA basis to x standard basis
+		r[3] = e[6];//Farthest length PCA basis to y standard basis
+		r[4] = e[7];//Farthest length PCA basis to y standard basis
+		r[5] = e[8];//Farthest length PCA basis to y standard basis
+		r[6] = e[0];//Shortest length PCA basis to z standard basis
+		r[7] = e[1];//Shortess length PCA basis to z standard basis
+		r[8] = e[2];//Shortset length PCA basis to z standard basis
+		memcpy (e, r, sizeof(m3f32));
+	}
+	{
+		v3f32 v;
+		v[0] = w[1];
+		v[1] = w[2];
+		v[2] = w[0];
+		memcpy (w, v, sizeof(v3f32));
+	}
+}
+
+
+//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
+static void skitrack_cov (v4f32 const x[], uint32_t n, m3f32 c, float k)
+{
+	uint32_t dim = 3; //Number of dimensions in point
+	uint32_t ldx = 4; //Number of floats per point
+	ASSERT (n > 1);
+	float alpha = (1.0f / ((float)n - 1.0f)) * k;
+	float beta = (1.0f - k);
+	//https://stattrek.com/matrix-algebra/covariance-matrix.aspx
+	//https://software.intel.com/content/www/us/en/develop/articles/sgemm-for-intel-processor-graphics.html
+	//matrix(x) := scalar(alpha) * matrix(x) * matrix(x)^T + scalar(beta) * matrix(x)
+	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha, (float const*)x, ldx, (float const*)x, ldx, beta, c, dim);
+}
+
+
+//Rotate the pointcloud
+static void skitrack_rotate (m3f32 const r, v4f32 const x[], v4f32 y[], uint32_t n)
+{
+	uint32_t dim = 3; //Number of dimensions in point
+	uint32_t ldx = 4; //Number of floats per point
+	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, (float const*)x, ldx, 0.0f, (float*)y, ldx);
+}
+
+
+//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
+static void skitrack_eigen (m3f32 const c, m3f32 e, v3f32 w)
+{
+	uint32_t dim = 3; //Number of dimensions in point
+	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
+	memcpy (e, c, sizeof (float)*3*3);
+	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', dim, e, dim, w);
+}
+
+
+static void skitrack_centering (float y[], float const x[], uint32_t n, float k, v3f32 centroid)
+{
+	ASSERT (n > 0); //Divide by zero protection
+	uint32_t const dim = 3; //Number of dimensions
+	uint32_t const ldx = 4; //Number of floats per point
+
+	//Move the center of all points to origin:
+	//vf32_move_center_to_zero (dim, x, ldx, x1, ldx, n, centroid);
+	v3f32 mean = {0.0f, 0.0f, 0.0f};
+	vf32_addv (dim, mean, 0, mean, 0, x, ldx, n);
+	vsf32_mul (dim, mean, mean, (1.0f / (float)n));
+	centroid[0] = centroid[0] * (1.0f - k) + k * mean[0];
+	centroid[1] = centroid[1] * (1.0f - k) + k * mean[1];
+	centroid[2] = centroid[2] * (1.0f - k) + k * mean[2];
+	centroid[1] = 0.0f;
+	vf32_subv (dim, y, ldx, x, ldx, centroid, 0, n);
+}
+
+
 
 
 /**
@@ -104,44 +198,16 @@ float x1[],
 uint32_t n,
 uint32_t ldx,
 float centroid[3],
-float centroid1[3],
 float centroid_k,
 float w[3],
 float c[3*3],
-float c1[3*3],
 float e[3*3],
-float r[3*3],
-float h[3*3],
-float k
+float covk
 )
 {
-	ASSERT (n > 0); //Divide by zero protection
-	uint32_t dim = 3; //Number of dimensions
-
 	//Move the center of all points to origin:
-	//vf32_move_center_to_zero (dim, x, ldx, x1, ldx, n, centroid);
-	v3f32 mean = {0.0f, 0.0f, 0.0f};
-	vf32_addv (dim, mean, 0, mean, 0, x, ldx, n);
-	vsf32_mul (dim, mean, mean, (1.0f / (float)n));
-	centroid[0] = centroid[0] * (1.0f - centroid_k) + centroid_k * mean[0];
-	centroid[1] = centroid[1] * (1.0f - centroid_k) + centroid_k * mean[1];
-	centroid[2] = centroid[2] * (1.0f - centroid_k) + centroid_k * mean[2];
-	centroid[1] = 0.0f;
-	vf32_subv (dim, x1, ldx, x, ldx, centroid, 0, n);
-	centroid1[0] = mean[0] - centroid[0];
-	centroid1[1] = 0.0f;
-	centroid1[2] = mean[2] - centroid[2];
 
-	//Calculate the covariance matrix of the points which can be used to get the orientation of the points:
-	//https://stattrek.com/matrix-algebra/covariance-matrix.aspx
-	//matrix(c) := scalar(alpha) * matrix(pc1) * matrix(pc1)^T
-	{
-		ASSERT (n > 1);
-		float alpha = 1.0f / ((float)n - 1.0f);
-		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha*k, x1, ldx, x1, ldx, (1.0f - k), c, dim);
-		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha, x1, ldx, x1, ldx, 0.0f, c1, dim);
-		m3f32_sub (c1, c1, c);
-	}
+
 	/*
 	if (ny > 1000)
 	{
@@ -150,49 +216,21 @@ float k
 		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, ny, alpha*0.9f, y, ldx, y, ldx, 0.1f, c, dim);
 	}
 	*/
-	//Calculate the eigen vectors (c) and eigen values (w) from covariance matrix (c) which will get the orientation of the points:
-	//https://software.intel.com/sites/products/documentation/doclib/mkl_sa/11/mkl_lapack_examples/dsyev.htm
-	memcpy (e, c, sizeof (float)*3*3);
-	LAPACKE_ssyev (LAPACK_COL_MAJOR, 'V', 'U', dim, e, dim, w);
 
-
-	//Prevent pointcloud flipping:
-	//((0,1,0) dot (c[6], c[7], c[8]) < 0) = (c[7] < 0)
-	if (e[7] < 0.0f)
-	{
-		//Flip Y vector of pointcloud
-		e[3] *= -1.0f;
-		e[4] *= -1.0f;
-		e[5] *= -1.0f;
-		//Flip Z vector of pointcloud
-		e[6] *= -1.0f;//x
-		e[7] *= -1.0f;//y
-		e[8] *= -1.0f;//z
-	}
-
-
-	//Assemble a rotation matrix from eigen vectors which are used to rotate pointcloud:
-	//After rotation the pointcloud should be aligned to standard basis:
-	//Eigen column vectors in (c) are sorted by eigen values, shortest vector first:
-	r[0] = e[3];//Medium length PCA basis to x standard basis
-	r[1] = e[4];//Medium length PCA basis to x standard basis
-	r[2] = e[5];//Medium length PCA basis to x standard basis
-	r[3] = e[6];//Farthest length PCA basis to y standard basis
-	r[4] = e[7];//Farthest length PCA basis to y standard basis
-	r[5] = e[8];//Farthest length PCA basis to y standard basis
-	r[6] = e[0];//Shortest length PCA basis to z standard basis
-	r[7] = e[1];//Shortess length PCA basis to z standard basis
-	r[8] = e[2];//Shortset length PCA basis to z standard basis
-	//x : (3 * n) matrix
-	//r : (3 * 3) matrix
-	//x := r^T * x + 0*x
-
-	if (h)
-	{
-		//m3f32_mul (r, r, h);
-	}
-
-	cblas_sgemm (CblasColMajor, CblasTrans, CblasNoTrans, dim, n, dim, 1.0f, r, dim, x1, ldx, 0.0f, x, ldx);
+	// (c) is coveriance matix
+	// (e) is a matrix of eigen column vectors
+	// (w) is a vector of eigen values
+	// e := eigenvectors(c)
+	// w := eigenvalues(c)
+	// e := flipbasis(e)
+	// x := e^T * x1
+	// After rotation the pointcloud should be aligned to standard basis
+	skitrack_centering (x1, x, n, centroid_k, centroid);
+	skitrack_cov (x1, n, c, covk);
+	skitrack_eigen (c, e, w);
+	skitrack_conditional_basis_flip (e);
+	skitrack_reorder_eigen (e, w);
+	skitrack_rotate (e, x1, x, n);
 }
 
 
@@ -367,63 +405,7 @@ void pixel_to_point (float p[4], uint32_t xn, uint32_t yn, float pixel, float x,
 
 
 
-uint32_t point_project (float pix[], float imgf[], uint32_t xn, uint32_t yn, float v[], float v2[], uint32_t v_stride, uint32_t x_count, float min_z, float max_z)
-{
-	memset (pix, 0, sizeof(float) * xn * yn);
-	memset (imgf, 0, sizeof(float) * xn * yn);
-	uint32_t count = 0;
-	for (uint32_t i = 0; i < x_count; ++i, v += v_stride)
-	{
-		//v[2] += 1.0f;
-		//(x,y) becomes the pixel position:
-		//Set origin in the middle of the image and 20 pixels becomes 1 meter:
-		//z-value becomes the pixel value:
-		float x;
-		float y;
-		float z;
-		point_to_pixel (v, xn, yn, &z, &x, &y);
-		//Crop the pointcloud to the size of the image;
-		if (x >= xn){continue;}
-		if (y >= yn){continue;}
-		if (x < 0){continue;}
-		if (y < 0){continue;}
-		if (z < min_z){continue;}
-		if (z > max_z){continue;}
-		//Convert (x,y) to index row-major:
-		uint32_t index = ((uint32_t)y * xn) + (uint32_t)x;
-		//z += 10.0f;
-		//If multiple points land on one pixel then it will be accumalted but it will also be normalized later on:
-		pix[index] += z;
-		imgf[index] += 1.0f;
-		count++;
-		//pix[index] = 0.5f*pix[index] + 0.5f*z;
 
-
-		v2[0] = v[0];
-		v2[1] = v[1];
-		v2[2] = v[2];
-		v2[3] = v[3];
-		v2 += v_stride;
-	}
-
-	//Normalize every non zero pixel:
-	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
-	{
-		if (imgf[i] > 0.0f)
-		{
-			pix[i] /= imgf[i];
-		}
-	}
-
-	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
-	{
-		//Gradient convolution could be applied later so this statement will have no effect:
-		//It is important that this statement does not affect the end result:
-		//This statement test scenories where average pointcloud z-position is far of origin:
-		//pix[i] += 10.0f;
-	}
-	return count;
-}
 
 
 static void random_points (float v[], unsigned n)

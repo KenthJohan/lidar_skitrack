@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include "csc/csc_debug.h"
 #include "csc/csc_m3f32.h"
+#include "csc/csc_m3f32_print.h"
+#include "csc/csc_v3f32.h"
+#include "csc/csc_v3f32_print.h"
 
 #include "../shared/shared.h"
 #include "../shared/log.h"
@@ -10,7 +13,13 @@
 
 
 #define SKITRACK2_PEAKS_COUNT 1
-#define SKITRACK_STRENGHT_THRESHOLD 0.9f
+#define SKITRACK_STRENGHT_THRESHOLD 0.8f
+#define SKITRACK_POINTCLOUD_COUNT_THRESHOLD (LIDAR_WH*2/3)
+#define SKITRACK_POINTPLANE_COUNT_THRESHOLD (LIDAR_WH*2/3)
+#define SKITRACK_POINTCLOUD_THICKNESS_THRESHOLD  0.001f
+#define SKITRACK_POINTCLOUD_THICKNESS_THRESHOLD2  0.010f
+#define SKITRACK_NEAR_THRESHOLD 2.3f
+#define SKITRACK_NEARCOUNT_THRESHOLD 10
 #define SKITRACK_MIN_Z -0.1f
 #define SKITRACK_MAX_Z 0.1f
 
@@ -38,23 +47,22 @@
 	16: Find all peaks                  : (1D image) -> ((position), (strength))
 	17: Output of skitrack position     : ((position), (strength))
 */
+
+
+
 struct skitrack
 {
 	uint32_t pc_count;//Number of points in pointcloud
-	float pc1[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
-	uint32_t pc2_count;//Number of points in pointcloud
-	float pc2[LIDAR_WH*POINT_STRIDE];//All points of pointcloud (x,y,z,a),(x,y,z,a)
+	v4f32 pc1[LIDAR_WH];//All points of pointcloud (x,y,z,a),(x,y,z,a)
 	float w[3];//Eigen values
 	float covk;
 	float c[3*3];//Covariance matrix
 	float c1[3*3];//Covariance matrix
 	float e[3*3];//3x eigen vectors
 	float r[3*3];//Rotation matrix
-	float h[3*3];//Rotation matrix
 
 	float centroid_k;
 	float centroid[3];//Center point of pointcloud
-	float centroid1[3];//Center point of pointcloud
 
 	//2D images:
 	float imgf[IMG_XN*IMG_YN];//Used for normalizing pixel
@@ -71,24 +79,18 @@ struct skitrack
 
 	//Peaks index locations:
 	uint32_t peak_u32[SKITRACK2_PEAKS_COUNT];
-	float peak_f32[SKITRACK2_PEAKS_COUNT];
+	uint32_t peakg_u32[SKITRACK2_PEAKS_COUNT];
 	float trackpos[SKITRACK2_PEAKS_COUNT];
 
 	//Skitrack direction (x, x + k*y):
 	float k;
+	float kg;
 
-	float confidence;
 	float strength;
 
-	float anglez;
+	uint32_t pointplanecount;
+	uint32_t nearcount;
 };
-
-
-
-void skitrack_pca()
-{
-
-}
 
 
 
@@ -97,54 +99,115 @@ static void skitrack_rectify (struct skitrack * s)
 	ASSERT_PARAM_NOTNULL (s);
 
 
-	//s->pc_count = pointcloud_filter1 (s->pc1, 1.0f, 150, LIDAR_W-150);
+	{
+		v4f32 x[LIDAR_WH];
+		v3f32 centroid;
+		m3f32 c;
+		m3f32 e;
+		v3f32 w;
+		float k = 1.0f;
+		memcpy(x, s->pc1, sizeof (x));
+		skitrack_centering (x, x, s->pc_count, k, centroid);
+		skitrack_cov (x, s->pc_count, c, k);
+		skitrack_eigen (c, e, w);
+		skitrack_conditional_basis_flip (e);
+		skitrack_reorder_eigen (e, w);
+		csc_v3f32_print_rgb (stdout, w);
+		csc_v3f32_print_rgb (stdout, centroid);
+		//printf ("%f %f\n", w[2], 0.0006f);
+		if (w[2] < SKITRACK_POINTCLOUD_THICKNESS_THRESHOLD)
+		{
+			s->covk = 1.0f;
+			s->centroid_k = 1.0f;
+		}
+		else if (w[2] < SKITRACK_POINTCLOUD_THICKNESS_THRESHOLD2)
+		{
+			s->covk = 0.01f;
+			s->centroid_k = 0.01f;
+		}
+		else
+		{
+			s->covk = 0.0f;
+			s->centroid_k = 0.0f;
+		}
 
 
+		if (s->pc_count < SKITRACK_POINTCLOUD_COUNT_THRESHOLD)
+		{
+			s->covk = 0.0f;
+			s->centroid_k = 0.0f;
+		}
+	}
 
 	//Move pointcloud to the origin and rotate it:
 	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
-	if (s->pc_count > 10)
 	{
 		float aux[LIDAR_WH*POINT_STRIDE];
-		//s->anglez += 0.1f;
-		m3f32_rotate_z (s->h, s->anglez);
-		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->centroid1, s->centroid_k, s->w, s->c, s->c1, s->e, s->r, s->h, s->covk);
+		pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->centroid_k, s->w, s->c, s->e, s->covk);
 		//csc_m3f32_print_rgb (stdout, s->c1);
 		//csc_v3f32_print_rgb (stdout, s->centroid1);
 	}
-	/*
-	//Clamp points:
-	for (uint32_t i = 0; i < LIDAR_WH; ++i)
-	{
-		s->pc1[i*POINT_STRIDE+2] = CLAMP (s->pc1[i*POINT_STRIDE+2], -0.05f, 0.03f);
-	}
-	*/
-
-	/*
-	{
-		memset (s->pc2, 0, LIDAR_WH*POINT_STRIDE*sizeof(float));
-		s->pc2_count = 0;
-		for (uint32_t i = 0; i < LIDAR_WH; ++i)
-		{
-			float x;
-			float y;
-			float z;
-			point_to_pixel (s->pc1 + i*POINT_STRIDE, IMG_XN, IMG_YN, &z, &x, &y);
-			if (x >= IMG_XN){continue;}
-			if (y >= IMG_YN){continue;}
-			if (x < 0){continue;}
-			if (y < 0){continue;}
-			if (z > 0.1f){continue;}
-			s->pc2[s->pc2_count*POINT_STRIDE + 0] = s->pc1[i*POINT_STRIDE + 0];
-			s->pc2[s->pc2_count*POINT_STRIDE + 1] = s->pc1[i*POINT_STRIDE + 1];
-			s->pc2[s->pc2_count*POINT_STRIDE + 2] = s->pc1[i*POINT_STRIDE + 2];
-			s->pc2[s->pc2_count*POINT_STRIDE + 3] = s->pc1[i*POINT_STRIDE + 3];
-			s->pc2_count++;
-		}
-		printf ("s->pc2_count %i\n", s->pc2_count);
-	}
-	*/
 }
+
+
+
+
+
+static void skitrack_project (struct skitrack * s)
+{
+	memset (s->img1, 0, sizeof(float) * IMG_XN * IMG_YN);
+	memset (s->imgf, 0, sizeof(float) * IMG_XN * IMG_YN);
+	s->pointplanecount = 0;
+	for (uint32_t i = 0; i < s->pc_count; ++i)
+	{
+		//v[2] += 1.0f;
+		//(x,y) becomes the pixel position:
+		//Set origin in the middle of the image and 20 pixels becomes 1 meter:
+		//z-value becomes the pixel value:
+		float x;
+		float y;
+		float z;
+		point_to_pixel (s->pc1[i], IMG_XN, IMG_YN, &z, &x, &y);
+		//Crop the pointcloud to the size of the image;
+		if (x >= IMG_XN){continue;}
+		if (y >= IMG_YN){continue;}
+		if (x < 0){continue;}
+		if (y < 0){continue;}
+		if ((z > (SKITRACK_MIN_Z*2)) && (z < (SKITRACK_MAX_Z*2)))
+		{
+			s->pointplanecount++;
+		}
+		if (z < SKITRACK_MIN_Z){continue;}
+		if (z > SKITRACK_MAX_Z){continue;}
+		//Convert (x,y) to index row-major:
+		uint32_t index = ((uint32_t)y * IMG_XN) + (uint32_t)x;
+		//z += 10.0f;
+		//If multiple points land on one pixel then it will be accumalted but it will also be normalized later on:
+		s->img1[index] += z;
+		s->imgf[index] += 1.0f;
+		//pix[index] = 0.5f*pix[index] + 0.5f*z;
+	}
+
+	//Normalize every non zero pixel:
+	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
+	{
+		if (s->imgf[i] > 0.0f)
+		{
+			s->img1[i] /= s->imgf[i];
+		}
+	}
+
+	for (uint32_t i = 0; i < IMG_XN*IMG_YN; ++i)
+	{
+		//Gradient convolution could be applied later so this statement will have no effect:
+		//It is important that this statement does not affect the end result:
+		//This statement test scenories where average pointcloud z-position is far of origin:
+		//pix[i] += 10.0f;
+	}
+}
+
+
+
 
 
 static void skitrack_process (struct skitrack * s)
@@ -152,67 +215,23 @@ static void skitrack_process (struct skitrack * s)
 	ASSERT_PARAM_NOTNULL (s);
 
 	//Remove bad points:
-	pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, &s->pc_count, POINT_DIM, 1.0f);
+	{
+		s->pc_count = pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, s->pc_count, POINT_DIM, 0.1f);
+		uint32_t count = pointcloud_filter (s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, s->pc_count, POINT_DIM, SKITRACK_NEAR_THRESHOLD*SKITRACK_NEAR_THRESHOLD);
+		s->nearcount = s->pc_count - count;
+		s->pc_count = count;
+	}
 
-	skitrack_rectify (s);
+
+	if (s->pc_count > 100)
+	{
+		skitrack_rectify (s);
+	}
 
 	//Project 3D points to a 2D image:
 	//The center of the image is put ontop of the origin where all points are located:
-	{
-		/*
-		float trackpos = (s->peak_f32[0] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
-		float trackpos0 = trackpos-0.6f;
-		float trackpos1 = trackpos+0.6f;
+	skitrack_project (s);
 
-
-		if (s->strength > SKITRACK_STRENGHT_THRESHOLD)
-		{
-			s->trackpos += 0.5f*trackpos;
-			s->trackpos = CLAMP(s->trackpos, -trackpos*2.0f, trackpos*2.0f);
-			v4f32 p = {0.0f, s->trackpos, 0.0f, 0.0f};
-			vf32_subv (POINT_DIM, s->pc1, POINT_STRIDE, s->pc1, POINT_STRIDE, p, 0, s->pc_count);
-		}
-		*/
-
-
-		s->pc_count = point_project (s->img1, s->imgf, IMG_XN, IMG_YN, s->pc1, s->pc1, POINT_STRIDE, s->pc_count, SKITRACK_MIN_Z, SKITRACK_MAX_Z);
-
-		{
-			s->covk = 0.6f;
-			s->centroid_k = 0.6f;
-		}
-
-
-
-		/*
-		s->pc2_count = 0;
-		for (uint32_t i = 0; i < count; ++i)
-		{
-			float y = cloud_local[i*POINT_STRIDE + 1];
-			if ((y > trackpos0) && (y < trackpos1))
-			{
-				cloud_local[s->pc2_count*POINT_STRIDE + 0] = cloud_local[i*POINT_STRIDE + 0];
-				cloud_local[s->pc2_count*POINT_STRIDE + 1] = cloud_local[i*POINT_STRIDE + 1];
-				cloud_local[s->pc2_count*POINT_STRIDE + 2] = cloud_local[i*POINT_STRIDE + 2];
-				cloud_local[s->pc2_count*POINT_STRIDE + 3] = cloud_local[i*POINT_STRIDE + 3];
-				s->pc2_count++;
-			}
-		}
-		//printf ("s->pc2_count %i, trackpos=%f\n", s->pc2_count, trackpos);
-
-
-		v3f32 mean = {0.0f, 0.0f, 0.0f};
-		vf32_addv (POINT_DIM, mean, 0, mean, 0, cloud_local, POINT_STRIDE, s->pc2_count);
-		vsf32_mul (POINT_DIM, mean, mean, (1.0f / (float)s->pc2_count));
-		vf32_subv (POINT_DIM, cloud_local, POINT_STRIDE, cloud_local, POINT_STRIDE, mean, 0, s->pc2_count);
-
-
-		memset (s->pc2, 0, LIDAR_WH*POINT_STRIDE*sizeof(float));
-		cblas_sgemm (CblasColMajor, CblasNoTrans, CblasNoTrans, POINT_DIM, s->pc2_count, POINT_DIM, 1.0f, s->r, POINT_DIM, cloud_local, POINT_STRIDE, 0.0f, s->pc2, POINT_STRIDE);
-		//vf32_addv (POINT_DIM, s->pc2, POINT_STRIDE, s->pc2, POINT_STRIDE, s->centroid, 0, s->pc2_count);
-		*/
-
-	}
 
 
 	{
@@ -327,45 +346,34 @@ static void skitrack_process (struct skitrack * s)
 		{
 			s->peak_u32[i] = CLAMP (s->peak_u32[i], 10, IMG_YN-10);
 			s->strength = s->q2[s->peak_u32[i]];
-			s->peak_f32[i] = s->peak_u32[i];
-			s->trackpos[i] = (s->peak_f32[i] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
-		}
-
-		if ((s->strength < SKITRACK_STRENGHT_THRESHOLD) || (s->pc_count < (LIDAR_WH*0.5f)))
-		{
-			s->confidence -= 0.1f;
-		}
-		else
-		{
-			s->confidence += 0.05f;
+			s->trackpos[i] = ((float)s->peak_u32[i] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
 		}
 	}
 
 
-	//Memory functionality of the skitrack:
-	if (s->strength > SKITRACK_STRENGHT_THRESHOLD)
-	{
-		{
-			int32_t o = s->peak_f32[0];//Get index location of the peak 0
-			int32_t w = 12;//Memory radius around skitrack
-			int32_t a = MAX (o-w, 0);//Start index
-			int32_t b = MIN (o+w, IMG_YN);//Stop index
-			//Decrease skitrack memory:
-			for (int32_t i = 0; i < IMG_YN; ++i)
-		{
-			s->qmem[i] *= 0.9f;
-		}
-			//Reset memory around skitrack:
-			for (int32_t i = a; i < b; ++i)
-		{
-			s->qmem[i] = 1.0f;
-		}
-		}
 
+	//Decrease skitrack memory:
+	for (int32_t i = 0; i < IMG_YN; ++i)
+	{
+		s->qmem[i] *= 0.9f;
+	}
+
+	//Memory functionality of the skitrack:
+	if ((s->covk > 0.0f) && (s->strength > SKITRACK_STRENGHT_THRESHOLD))
+	{
+		vu32_cpy (SKITRACK2_PEAKS_COUNT, s->peakg_u32, s->peak_u32);
+		s->kg = s->k;
+
+
+		int32_t o = s->peak_u32[0];//Get index location of the peak 0
+		int32_t w = 12;//Memory radius around skitrack
+		int32_t a = MAX (o-w, 0);//Start index
+		int32_t b = MIN (o+w, IMG_YN);//Stop index
+
+		//Reset memory around skitrack:
+		for (int32_t i = a; i < b; ++i)
 		{
-			//float a = atan (s->k);
-			//printf ("anglez: k=%f, a1=%f, a2,%f\n", s->k, s->anglez*180.0f/M_PI, a*180.0f/M_PI);
-			//s->anglez += a*0.3f;
+			s->qmem[i] = 2.0f;
 		}
 
 		//Slowly change the skitrack memory for new information:
@@ -373,50 +381,26 @@ static void skitrack_process (struct skitrack * s)
 		{
 			s->qmem[i] += s->q2[i] * 0.15f;
 		}
-
-	}
-	else
-	{
-		//s->anglez *= 0.9f; //Radians
 	}
 
 
 
 
 
-	//Exponential Moving Average (EMA) filter:
-	/*
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		float k = 0.7f;
-		s->g1[i] = k * s->g1[i] + (1.0f - k) * (float)s->g[i];
+		s->trackpos[i] = ((float)s->peakg_u32[i] - (float)IMG_YN/2.0f) * (float)IMG_SCALE;
 	}
-	*/
 
-
-
-	s->confidence = CLAMP(s->confidence, 0.0f, 1.0f);
 }
 
 
-static void skitrack_subset (struct skitrack * s)
+static void skitrack_print_info (struct skitrack * s)
 {
-	//Experiment of subset point to make a local PCA plane:
-	{
-		int32_t o = s->peak_f32[0];//Skitrack position
-		int32_t w = 15;
-		int32_t a = MAX (o-w, 0);
-		int32_t b = MIN (o+w, IMG_YN);
-		s->pc2_count = pointcloud_subset (s->img1, s->pc2, a, b);
-		//s->pc_count = pointcloud_subset (s->img1, s->pc1, a, b);
-	}
-
-	//Move pointcloud to the origin and rotate it:
-	//pointcloud_pca requires an extra memory buffer for storing a temporary pointcloud due to nature of matrix-matrix-multiplcation:
-	{
-		//float aux[LIDAR_WH*POINT_STRIDE];
-		//pointcloud_pca (s->pc1, aux, s->pc_count, POINT_STRIDE, s->centroid, s->w, s->c, s->r);
-	}
+	printf ("[INFO] Pointcount: %i of %i (th=%i)\n", s->pc_count, LIDAR_WH, SKITRACK_POINTCLOUD_COUNT_THRESHOLD);
+	printf ("[INFO] Pointplanecount: %i of %i (th=%i)\n", s->pointplanecount, s->pc_count, SKITRACK_POINTPLANE_COUNT_THRESHOLD);
+	printf ("[INFO] Nearcount: %i of %i (th=%i)\n", s->nearcount, s->pc_count, SKITRACK_NEARCOUNT_THRESHOLD);
+	printf ("[INFO] Trackpos: %fm\n", s->trackpos[0]);
+	printf ("[INFO] covk: %3.0f%%\n", s->covk*100.0f);
+	printf ("[INFO] Strength: [%i] %f (th=%3.3f)\n", s->peak_u32[0], s->strength, SKITRACK_STRENGHT_THRESHOLD);
 }
-
-

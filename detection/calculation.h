@@ -6,6 +6,8 @@
 #include "csc/csc_math.h"
 #include "csc/csc_linmat.h"
 #include "csc/csc_m3f32.h"
+#include "csc/csc_m3f32_print.h"
+#include "csc/csc_v3f32_print.h"
 
 #include "../shared/shared.h"
 #include "points_read.h"
@@ -26,6 +28,7 @@
 #define VISUAL_MODE_IMG2              UINT32_C(0x00000002)
 #define VISUAL_MODE_IMG3              UINT32_C(0x00000003)
 #define VISUAL_MODE_TRACKING          UINT32_C(0x00000100)
+#define VISUAL_MODE_TRACKINGG         UINT32_C(0x00000200)
 #define VISUAL_MODE_VERBOOSE_MASK     UINT32_C(0x000000F0)
 #define VISUAL_MODE_VERBOOSE1         UINT32_C(0x00000010)
 
@@ -60,13 +63,13 @@ static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[]
 	}
 	for (uint32_t i = 0; i < SKITRACK2_PEAKS_COUNT; ++i)
 	{
-		img[s2->peak_u32[i] * IMG_XN + 0] |= RGBA (0xFF, 0xFF, 0xFF, 0xFF);
-		if (s2->peak_u32[i] < IMG_YN)
+		img[s2->peakg_u32[i] * IMG_XN + 0] |= RGBA (0xFF, 0xFF, 0xFF, 0xFF);
+		if (s2->peakg_u32[i] < IMG_YN)
 		{
-			int32_t y = s2->peak_u32[i];
+			int32_t y = s2->peakg_u32[i];
 			for (int32_t x = 0; x < IMG_XN/2; ++x)
 			{
-				int32_t yy = roundf((float)y + (float)x * s2->k);
+				int32_t yy = roundf((float)y + (float)x * s2->kg);
 				if (yy < 0){continue;}
 				if (yy >= IMG_YN){continue;}
 				ASSERT (yy >= 0);
@@ -77,6 +80,10 @@ static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[]
 				if (flags & VISUAL_MODE_TRACKING)
 				{
 					img[index] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
+				}
+				else if (flags & VISUAL_MODE_TRACKINGG)
+				{
+					img[index] |= RGBA (0x00, 0x55, 0x55, 0xFF);
 				}
 				else
 				{
@@ -135,7 +142,7 @@ static void draw_img4 (nng_socket sock, struct skitrack * s2)
 		*/
 	}
 
-	imgv[s2->peak_u32[0]+IMG_YN*2] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
+	imgv[s2->peakg_u32[0]+IMG_YN*2] |= RGBA (0x00, 0x00, 0xFF, 0xFF);
 
 
 	mg_send_set (sock, MYENT_TEXTURE2, MG_TEXTURE_CONTENT, imgv, IMG3_XN*IMG_YN*sizeof(uint32_t));
@@ -296,7 +303,7 @@ static void show_init (nng_socket sock)
 }
 
 
-static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
+static void show (struct skitrack * ski, nng_socket sock, uint32_t flags)
 {
 	//Used for visual confirmation of the algorithm internal workings:
 	struct
@@ -312,12 +319,11 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	//points_test_sinus_slope (s1->pc);
 
 	//Copy unrectified pointcloud:
-	memcpy (points.cloud1, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
-	skitrack_process (s2);
+	memcpy (points.cloud1, ski->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	skitrack_process (ski);
 
 	//Copy rectified pointcloud:
-	memcpy (points.cloud2, s2->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
-	memcpy (points.cloud3, s2->pc2, LIDAR_WH*POINT_STRIDE*sizeof(float));
+	memcpy (points.cloud2, ski->pc1, LIDAR_WH*POINT_STRIDE*sizeof(float));
 
 	for (int i = 0; i < LIDAR_WH; ++i)
 	{
@@ -364,23 +370,27 @@ static void show (struct skitrack * s2, nng_socket sock, uint32_t flags)
 	}
 
 
-	printf ("[INFO] PC Count: %i of %i\n", s2->pc_count, LIDAR_WH);
-	printf ("[INFO] Trackpos: %f\n", s2->trackpos[0]);
-	printf ("[INFO] Confidence: %3.0f%%\n", s2->confidence*100.0f);
-	printf ("[INFO] Strength: [%i] %f, Threshold=%f\n", s2->peak_u32[0], s2->strength, SKITRACK_STRENGHT_THRESHOLD);
+	skitrack_print_info (ski);
+
+
+
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q2[s2->peak_u32[0]-2],s2->q2[s2->peak_u32[0]-1],s2->q2[s2->peak_u32[0]],s2->q2[s2->peak_u32[0]+1],s2->q2[s2->peak_u32[0]+2]);
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q3[s2->peak_u32[0]-2],s2->q3[s2->peak_u32[0]-1],s2->q3[s2->peak_u32[0]],s2->q3[s2->peak_u32[0]+1],s2->q3[s2->peak_u32[0]+2]);
 
-	draw_pca (sock, s2);
+	draw_pca (sock, ski);
 	//draw_img2 (sock, s2, flags);
-	draw_img4 (sock, s2);
-	if ((s2->strength > SKITRACK_STRENGHT_THRESHOLD) && (s2->confidence > 0.5f))
+	draw_img4 (sock, ski);
+	if ((ski->pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski->nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski->covk > 0.0f) && (ski->strength > SKITRACK_STRENGHT_THRESHOLD))
 	{
-		draw_skitrack (sock, s2, imgv, flags | VISUAL_MODE_TRACKING);
+		draw_skitrack (sock, ski, imgv, flags | VISUAL_MODE_TRACKING);
+	}
+	else if ((ski->pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) &&(ski->nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski->covk > 0.0f))
+	{
+		draw_skitrack (sock, ski, imgv, flags | VISUAL_MODE_TRACKINGG);
 	}
 	else
 	{
-		draw_skitrack (sock, s2, imgv, flags);
+		draw_skitrack (sock, ski, imgv, flags);
 		//getchar();
 	}
 }

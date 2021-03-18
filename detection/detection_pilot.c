@@ -12,6 +12,10 @@
 #define ARG_VERBOSE          UINT32_C(0x00000002)
 #define ARG_STDIN            UINT32_C(0x00000010)
 
+
+#define GHOSTIME_START 100
+#define GHOSTIME_STOP  700
+
 static void on_connect (struct mosquitto *mosq, void *obj, int reason_code)
 {
 	UNUSED (obj);
@@ -34,7 +38,7 @@ static void publish_float (struct mosquitto *mosq, int qos, char const * topic, 
 {
 	char payload[20];
 	snprintf (payload, sizeof(payload), "%f", number);
-	printf ("Msg %s: %s\n", topic, payload);
+	//printf ("Msg %s: %s\n", topic, payload);
 	int rc = mosquitto_publish (mosq, NULL, topic, strlen (payload), payload, qos, 0);
 	if (rc != MOSQ_ERR_SUCCESS)
 	{
@@ -142,6 +146,8 @@ int main (int argc, char const * argv[])
 			fseek (lidarfile, 0, SEEK_SET);
 		}
 		struct skitrack ski = {0};
+		float speed = 0.0f;
+		uint32_t ghostime = 0;
 		while (1)
 		{
 			if (arg_udelay > 0)
@@ -158,20 +164,43 @@ int main (int argc, char const * argv[])
 			ski.pc_count = LIDAR_WH;
 			skitrack_process (&ski);
 
-			printf ("[INFO] PC Count: %i of %i\n", ski.pc_count, LIDAR_WH);
-			printf ("[INFO] Trackpos: %f\n", ski.trackpos[0]);
-			printf ("[INFO] Confidence: %3.0f%%\n", ski.confidence*100.0f);
-			printf ("[INFO] Strength: [%i] %f, Threshold=%f\n", ski.peak_u32[0], ski.strength, SKITRACK_STRENGHT_THRESHOLD);
-
 			//Send skitrack info to MQTT
-			float speed = 0.0f;
-			if ((ski.confidence > 0.5f) && (ski.strength > SKITRACK_STRENGHT_THRESHOLD))
+			if ((ski.pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski.nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski.covk > 0.0f) && (ski.strength > SKITRACK_STRENGHT_THRESHOLD))
 			{
-				speed = (ski.confidence - 0.5f) * 2.0f;
+				//Trackmode
+				speed += 0.01f;
+				ghostime = 0;
 			}
+			else if ((ski.pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski.nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski.covk > 0.0f))
+			{
+				speed = 0.0f;
+				ghostime++;
+			}
+			else
+			{
+				speed = 0.0f;
+			}
+
+
+			if (ghostime > GHOSTIME_START)
+			{
+				speed = 0.5;
+			}
+			else if (ghostime > GHOSTIME_STOP)
+			{
+				speed = 0.0f;
+			}
+
+			speed = CLAMP (speed, 0.0f, 1.0f);
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/offset", ski.trackpos[0]);
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/angle", atanf (ski.k));
 			publish_float (mosq, arg_mqtt_qos, "/command/c2h/lidar/speed", speed);
+
+
+
+			skitrack_print_info (&ski);
+			printf ("[INFO] ghostime %i\n", ghostime);
+			printf ("[INFO] speed %f\n", speed);
 		}
 	}
 
