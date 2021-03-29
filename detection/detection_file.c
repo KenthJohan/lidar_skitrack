@@ -123,6 +123,7 @@ int main (int argc, char const * argv[])
 		FILE * f = fopen (arg_filename, "rb");
 		fseek (f, arg_frame * sizeof (float) * LIDAR_WH * POINT_STRIDE, SEEK_SET);
 		ASSERT_NOTNULL (f);
+		int a = '\n';
 		while (1)
 		{
 			ski.framenr = (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE);
@@ -130,9 +131,9 @@ int main (int argc, char const * argv[])
 			ASSERTF (r == 1, "%i", r);
 			ski.pc_count = LIDAR_WH;
 			show (&ski, sock, arg_showflags);
-			if (arg_flags & ARG_CTRLMODE)
+			if ((arg_flags & ARG_CTRLMODE) && a == '\n')
 			{
-				getchar();
+				a = getchar();
 			}
 			if (arg_usleep)
 			{

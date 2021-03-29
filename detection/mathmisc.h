@@ -136,6 +136,7 @@ static void skitrack_cov (v4f32 const x[], uint32_t n, m3f32 c, float k)
 	//https://stattrek.com/matrix-algebra/covariance-matrix.aspx
 	//https://software.intel.com/content/www/us/en/develop/articles/sgemm-for-intel-processor-graphics.html
 	//matrix(x) := scalar(alpha) * matrix(x) * matrix(x)^T + scalar(beta) * matrix(x)
+	//c := c*k + (x*x^t) * (1-k)
 	cblas_sgemm (CblasColMajor, CblasNoTrans, CblasTrans, dim, dim, n, alpha, (float const*)x, ldx, (float const*)x, ldx, beta, c, dim);
 }
 
