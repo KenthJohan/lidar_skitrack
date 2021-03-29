@@ -125,7 +125,7 @@ int main (int argc, char const * argv[])
 		ASSERT_NOTNULL (f);
 		while (1)
 		{
-			printf ("[INFO] frame: %f\n", (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE));
+			ski.framenr = (float)ftell(f) / (float)(sizeof (float) * LIDAR_WH * POINT_STRIDE);
 			int r = fread (ski.pc1, sizeof (float) * POINT_STRIDE * LIDAR_WH, 1, f);
 			ASSERTF (r == 1, "%i", r);
 			ski.pc_count = LIDAR_WH;

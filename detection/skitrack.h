@@ -52,6 +52,7 @@
 
 struct skitrack
 {
+	uint32_t framenr;
 	uint32_t pc_count;//Number of points in pointcloud
 	v4f32 pc1[LIDAR_WH];//All points of pointcloud (x,y,z,a),(x,y,z,a)
 	float w[3];//Eigen values
@@ -112,8 +113,8 @@ static void skitrack_rectify (struct skitrack * s)
 		skitrack_eigen (c, e, w);
 		skitrack_conditional_basis_flip (e);
 		skitrack_reorder_eigen (e, w);
-		csc_v3f32_print_rgb (stdout, w);
-		csc_v3f32_print_rgb (stdout, centroid);
+		//csc_v3f32_print_rgb (stdout, w);
+		//csc_v3f32_print_rgb (stdout, centroid);
 		//printf ("%f %f\n", w[2], 0.0006f);
 		if (w[2] < SKITRACK_POINTCLOUD_THICKNESS_THRESHOLD)
 		{
@@ -397,10 +398,19 @@ static void skitrack_process (struct skitrack * s)
 
 static void skitrack_print_info (struct skitrack * s)
 {
-	printf ("[INFO] Pointcount: %i of %i (th=%i)\n", s->pc_count, LIDAR_WH, SKITRACK_POINTCLOUD_COUNT_THRESHOLD);
-	printf ("[INFO] Pointplanecount: %i of %i (th=%i)\n", s->pointplanecount, s->pc_count, SKITRACK_POINTPLANE_COUNT_THRESHOLD);
-	printf ("[INFO] Nearcount: %i of %i (th=%i)\n", s->nearcount, s->pc_count, SKITRACK_NEARCOUNT_THRESHOLD);
-	printf ("[INFO] Trackpos: %fm\n", s->trackpos[0]);
-	printf ("[INFO] covk: %3.0f%%\n", s->covk*100.0f);
-	printf ("[INFO] Strength: [%i] %f (th=%3.3f)\n", s->peak_u32[0], s->strength, SKITRACK_STRENGHT_THRESHOLD);
+	char const * color_strength = (s->strength > SKITRACK_STRENGHT_THRESHOLD) ? TCOLF("10") : TCOLF("9");
+	char const * color_pointplanecount = (s->pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) ? TCOLF("10") : TCOLF("9");
+	char const * color_nearcount = (s->nearcount < SKITRACK_NEARCOUNT_THRESHOLD) ? TCOLF("10") : TCOLF("9");
+	printf ("[INFO]         framenr: %5i\n", s->framenr);
+	printf ("[INFO]      Pointcount: %5i of %5i\n", s->pc_count, LIDAR_WH);
+	printf ("[INFO] Pointplanecount: %s%5i"TCOL_RST" of %5i "TCOLF("8")"(th=%5i)"TCOL_RST"\n", color_pointplanecount, s->pointplanecount, s->pc_count, SKITRACK_POINTPLANE_COUNT_THRESHOLD);
+	printf ("[INFO]       Nearcount: %s%5i"TCOL_RST" of %5i "TCOLF("8")"(th=%5i)"TCOL_RST"\n", color_nearcount, s->nearcount, s->pc_count, SKITRACK_NEARCOUNT_THRESHOLD);
+	//printf ("[INFO] covk: %3.0f%%\n", s->covk*100.0f);
+	printf ("[INFO]        Strength: %s%+7.3f"TCOL_RST" "TCOLF("8")"(th=%3.3f)"TCOL_RST"\n", color_strength, s->strength, SKITRACK_STRENGHT_THRESHOLD);
+	printf ("[INFO]        Trackpos: %+7.3f m   "TCOLF("8")"[%i]"TCOL_RST"\n", s->trackpos[0], s->peak_u32[0]);
+	printf ("[INFO]      Trackangle: %+7.3f deg "TCOLF("8")"[%f]"TCOL_RST"\n", atan(s->k) * (180.0f / M_PI), s->k);
 }
+
+
+
+
