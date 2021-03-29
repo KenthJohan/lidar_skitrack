@@ -46,7 +46,7 @@ static void convert_float_to_rgba (uint32_t img[], float pix[], uint32_t n)
 }
 
 
-static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[], uint32_t flags)
+static void skitrack_drawtracks (nng_socket sock, struct skitrack * s2, uint32_t img[], uint32_t flags)
 {
 	//Visualize the skitrack and more information:
 	switch (flags & VISUAL_MODE_IMG_MASK)
@@ -96,7 +96,7 @@ static void draw_skitrack (nng_socket sock, struct skitrack * s2, uint32_t img[]
 }
 
 
-static void draw_img2 (nng_socket sock, struct skitrack * s1, uint32_t flags)
+static void skitrack_draw_img2 (nng_socket sock, struct skitrack * s1, uint32_t flags)
 {
 	float m[4*4] = {0.0f};
 	//m4f32_identity (m);
@@ -120,7 +120,7 @@ static void draw_img2 (nng_socket sock, struct skitrack * s1, uint32_t flags)
 }
 
 
-static void draw_img4 (nng_socket sock, struct skitrack * s2)
+static void skitrack_draw_img4 (nng_socket sock, struct skitrack * s2)
 {
 	uint32_t imgv[IMG3_XN*IMG_YN] = {0};//Used for visual confirmation that the algorithm works
 
@@ -149,7 +149,7 @@ static void draw_img4 (nng_socket sock, struct skitrack * s2)
 }
 
 
-static void draw_tracklines()
+static void skitrack_drawtrack3d()
 {
 	/*
 	vf32_set3 (linepos1[VISUAL_LINE_ORIGIN_0].a, 0.0f, 0.0f, 0.0f);
@@ -187,7 +187,7 @@ static void draw_tracklines()
 }
 
 
-static void draw_pca (nng_socket sock, struct skitrack * s1)
+static void skitrack_draw_pca (nng_socket sock, struct skitrack * s1)
 {
 	struct v4f32_line pos[3];
 	struct u32_line col[3];
@@ -303,7 +303,7 @@ static void show_init (nng_socket sock)
 }
 
 
-static void show (struct skitrack * ski, nng_socket sock, uint32_t flags)
+static void skitrack_show (struct skitrack * ski, nng_socket sock, uint32_t flags)
 {
 	//Used for visual confirmation of the algorithm internal workings:
 	struct
@@ -377,20 +377,20 @@ static void show (struct skitrack * ski, nng_socket sock, uint32_t flags)
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q2[s2->peak_u32[0]-2],s2->q2[s2->peak_u32[0]-1],s2->q2[s2->peak_u32[0]],s2->q2[s2->peak_u32[0]+1],s2->q2[s2->peak_u32[0]+2]);
 	//printf ("[INFO] Strength: %f %f %f %f %f\n", s2->q3[s2->peak_u32[0]-2],s2->q3[s2->peak_u32[0]-1],s2->q3[s2->peak_u32[0]],s2->q3[s2->peak_u32[0]+1],s2->q3[s2->peak_u32[0]+2]);
 
-	draw_pca (sock, ski);
+	skitrack_draw_pca (sock, ski);
 	//draw_img2 (sock, s2, flags);
-	draw_img4 (sock, ski);
+	skitrack_draw_img4 (sock, ski);
 	if ((ski->pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) && (ski->nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski->covk > 0.0f) && (ski->strength > SKITRACK_STRENGHT_THRESHOLD))
 	{
-		draw_skitrack (sock, ski, imgv, flags | VISUAL_MODE_TRACKING);
+		skitrack_drawtracks (sock, ski, imgv, flags | VISUAL_MODE_TRACKING);
 	}
 	else if ((ski->pointplanecount > SKITRACK_POINTPLANE_COUNT_THRESHOLD) &&(ski->nearcount < SKITRACK_NEARCOUNT_THRESHOLD) && (ski->covk > 0.0f))
 	{
-		draw_skitrack (sock, ski, imgv, flags | VISUAL_MODE_TRACKINGG);
+		skitrack_drawtracks (sock, ski, imgv, flags | VISUAL_MODE_TRACKINGG);
 	}
 	else
 	{
-		draw_skitrack (sock, ski, imgv, flags);
+		skitrack_drawtracks (sock, ski, imgv, flags);
 		//getchar();
 	}
 }

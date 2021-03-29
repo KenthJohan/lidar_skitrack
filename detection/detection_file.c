@@ -32,7 +32,7 @@
 
 #include "../shared/shared.h"
 #include "../shared/log.h"
-#include "calculation.h"
+#include "skitrack_show.h"
 #include "mg_send.h"
 
 #define ARG_HELP             UINT32_C(0x00000001)
@@ -107,7 +107,7 @@ int main (int argc, char const * argv[])
 			int r = fread (ski.pc1, sizeof (float) * LIDAR_WH * POINT_STRIDE, 1, stdin);
 			ASSERTF (r == 1, "%i", r);
 			ski.pc_count = LIDAR_WH;
-			show (&ski, sock, arg_showflags);
+			skitrack_show (&ski, sock, arg_showflags);
 		}
 	}
 	else if ((arg_flags & ARG_LEGACY_FILENAME) && arg_filename)
@@ -115,7 +115,7 @@ int main (int argc, char const * argv[])
 		printf ("[INFO] Opening legacy file %s to read LiDAR frames.\n", arg_filename);
 		legacy_points_read_filename (arg_filename, ski.pc1, &ski.pc_count);
 		printf ("[INFO] pc_count %i\n", ski.pc_count);
-		show (&ski, sock, arg_showflags);
+		skitrack_show (&ski, sock, arg_showflags);
 	}
 	else if (arg_filename)
 	{
@@ -130,7 +130,7 @@ int main (int argc, char const * argv[])
 			int r = fread (ski.pc1, sizeof (float) * POINT_STRIDE * LIDAR_WH, 1, f);
 			ASSERTF (r == 1, "%i", r);
 			ski.pc_count = LIDAR_WH;
-			show (&ski, sock, arg_showflags);
+			skitrack_show (&ski, sock, arg_showflags);
 			if ((arg_flags & ARG_CTRLMODE) && a == '\n')
 			{
 				a = getchar();
