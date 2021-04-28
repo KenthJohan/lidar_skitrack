@@ -4,3 +4,6 @@
 [submodule "recorder/csc"]
 	path = recorder/csc
 	url = https://github.com/KenthJohan/csc
+[submodule "detection2/csc"]
+	path = detection2/csc
+	url = https://github.com/KenthJohan/csc
